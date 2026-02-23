@@ -43,7 +43,7 @@ export function AdminOverview() {
 
   const systemStatus = [
     { name: 'OpenAI API', status: 'operational', lastCheck: '2 mins ago' },
-    { name: 'Supabase Database', status: 'operational', lastCheck: '2 mins ago' },
+    { name: 'Primary Database', status: 'operational', lastCheck: '2 mins ago' },
     { name: 'Stripe Payment Processing', status: 'operational', lastCheck: '5 mins ago' },
     { name: 'SendGrid Email Delivery', status: 'operational', lastCheck: '10 mins ago' },
     { name: 'PDF Generation Service', status: 'degraded', lastCheck: '15 mins ago' },

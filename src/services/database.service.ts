@@ -1,6 +1,6 @@
 /**
  * Backend Database Service
- * Uses backend API endpoints instead of direct Supabase access.
+ * Uses backend API endpoints instead of direct database access.
  */
 
 import { apiClient } from './api';

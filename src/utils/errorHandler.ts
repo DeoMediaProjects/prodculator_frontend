@@ -10,7 +10,7 @@ const originalConsoleWarn = console.warn;
 // List of error messages to suppress
 const suppressedErrors = [
   'Failed to fetch',
-  'SUPABASE_NOT_CONFIGURED',
+  'BACKEND_NOT_CONFIGURED',
   'NetworkError',
   'fetch failed',
   'TypeError: Failed to fetch',
@@ -43,8 +43,8 @@ console.warn = (...args: any[]) => {
     return; // Suppress this warning
   }
   
-  // Suppress Supabase warnings
-  if (warnMessage.includes('Supabase credentials')) {
+  // Suppress managed database warnings
+  if (warnMessage.includes('backend credentials')) {
     return;
   }
   

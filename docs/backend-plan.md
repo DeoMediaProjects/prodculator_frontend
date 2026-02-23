@@ -2,9 +2,9 @@
 
 ## Context
 
-The Prodculator frontend (React/TypeScript) currently makes direct calls to Supabase, OpenAI, and Stripe from the browser. This exposes API keys (especially the OpenAI key via `VITE_OPENAI_API_KEY`), makes admin permission enforcement frontend-only (bypassable), and prevents proper server-side processing for script analysis, PDF generation, and webhook handling.
+The Prodculator frontend (React/TypeScript) currently makes direct calls to managed database, OpenAI, and Stripe from the browser. This exposes API keys (especially the OpenAI key via `VITE_OPENAI_API_KEY`), makes admin permission enforcement frontend-only (bypassable), and prevents proper server-side processing for script analysis, PDF generation, and webhook handling.
 
-This plan creates a dedicated Python FastAPI backend in a separate `backend/` folder. The frontend moves to `frontend/`. All auth, data access, and external API calls route through the backend. Supabase remains as the Postgres database and file storage.
+This plan creates a dedicated Python FastAPI backend in a separate `backend/` folder. The frontend moves to `frontend/`. All auth, data access, and external API calls route through the backend. managed database remains as the Postgres database and file storage.
 
 ---
 
@@ -17,7 +17,7 @@ Podculator 2.0/
 │   │   ├── __init__.py
 │   │   ├── main.py             # FastAPI app, CORS, router registration
 │   │   ├── config.py           # Pydantic Settings (env vars)
-│   │   ├── dependencies.py     # get_current_user, require_admin, get_supabase
+│   │   ├── dependencies.py     # get_current_user, require_admin, get_database_client
 │   │   ├── routers/
 │   │   │   ├── auth.py         # /api/auth/*
 │   │   │   ├── scripts.py      # /api/scripts/*
@@ -94,11 +94,11 @@ Podculator 2.0/
 - `backend/app/__init__.py`
 - `backend/app/config.py` — Pydantic `Settings` class for all env vars
 - `backend/app/main.py` — FastAPI app with CORS, router registration
-- `backend/app/dependencies.py` — Supabase client init, `get_current_user`, `require_admin`
+- `backend/app/dependencies.py` — managed database client init, `get_current_user`, `require_admin`
 - `backend/app/routers/health.py` — `GET /api/health`
 - `backend/.env.example`
 
-**Key dependencies:** `fastapi`, `uvicorn`, `pydantic-settings`, `supabase`, `python-multipart`, `httpx`
+**Key dependencies:** `fastapi`, `uvicorn`, `pydantic-settings`, `database-client`, `python-multipart`, `httpx`
 
 **Verify:** `uvicorn app.main:app --reload` starts, `GET /api/health` returns 200
 
@@ -108,7 +108,7 @@ Podculator 2.0/
 **Files to create:**
 - `backend/app/schemas/auth.py` — `SignUpRequest`, `SignInRequest`, `TokenResponse`, `AuthUserResponse`
 - `backend/app/schemas/common.py` — `ErrorResponse`, `SuccessResponse`, `PaginatedResponse`
-- `backend/app/services/auth_service.py` — wraps Supabase Admin Auth API
+- `backend/app/services/auth_service.py` — wraps Auth provider API
 - `backend/app/routers/auth.py` — 8 endpoints
 - `backend/app/models/enums.py` — `UserType`, `AdminRole`, `PlanType`
 
@@ -124,7 +124,7 @@ Podculator 2.0/
 | POST | `/api/auth/admin/signin` | No |
 | POST | `/api/auth/refresh` | Yes (refresh token) |
 
-**Auth approach:** Backend calls `supabase.auth.sign_in_with_password()`, returns Supabase JWT tokens to frontend. On subsequent requests, frontend sends `Authorization: Bearer <access_token>`. Backend verifies with `supabase.auth.get_user(token)` + fetches user profile from `users` table. Admin endpoints use `require_admin` dependency that checks `user_type == 'admin'`.
+**Auth approach:** Backend calls `backend auth handler`, returns managed database JWT tokens to frontend. On subsequent requests, frontend sends `Authorization: Bearer <access_token>`. Backend verifies with `backend auth handler` + fetches user profile from `users` table. Admin endpoints use `require_admin` dependency that checks `user_type == 'admin'`.
 
 **Port from:** `src/services/auth.service.ts`, `src/app/contexts/AuthContext.tsx`
 
@@ -133,7 +133,7 @@ Podculator 2.0/
 ### Phase 3: Script Upload + Analysis
 **Files to create:**
 - `backend/app/schemas/scripts.py` — `ScriptAnalysisResult` and sub-models (Pydantic versions of TS interfaces)
-- `backend/app/services/storage_service.py` — upload/download to Supabase Storage buckets
+- `backend/app/services/storage_service.py` — upload/download to backend storage buckets
 - `backend/app/services/script_analysis_service.py` — OpenAI GPT-4o calls, file validation, text extraction
 - `backend/app/routers/scripts.py` — 3 endpoints
 
@@ -240,10 +240,10 @@ Podculator 2.0/
 ---
 
 ### Phase 9: Frontend Migration
-**Create:** `frontend/src/services/api.ts` — single API client class that replaces all direct Supabase/OpenAI calls
+**Create:** `frontend/src/services/api.ts` — single API client class that replaces all direct managed database/OpenAI calls
 
 **Delete from frontend:**
-- `src/services/supabase.service.ts`
+- `src/services/database.service.ts`
 - `src/services/auth.service.ts`
 - `src/services/database.service.ts`
 - `src/services/script-analysis.service.ts`
@@ -262,12 +262,12 @@ Podculator 2.0/
 **Update all components/contexts** to use `api.signIn()`, `api.getReports()`, etc. instead of direct service calls
 
 **Update `AuthContext.tsx`** to:
-- Call `api.signIn()` / `api.signUp()` instead of `supabaseAuthService`
+- Call `api.signIn()` / `api.signUp()` instead of `authService`
 - Store tokens from backend response in localStorage
 - Remove mock admin auth, use real `api.adminSignIn()`
 
 **Update `ScriptContext.tsx`** to:
-- Call `api.uploadScript()` + `api.createReport()` instead of Supabase Edge Function
+- Call `api.uploadScript()` + `api.createReport()` instead of backend function
 
 ---
 
@@ -286,7 +286,7 @@ fastapi>=0.115.0
 uvicorn[standard]>=0.27.0
 pydantic>=2.6.0
 pydantic-settings>=2.1.0
-supabase>=2.3.0
+database-client>=2.3.0
 python-multipart>=0.0.9
 httpx>=0.27.0
 openai>=1.12.0
@@ -306,7 +306,7 @@ pytest-asyncio>=0.23.0
 
 `users`, `subscriptions`, `reports`, `payment_methods`, `email_gating_log`, `production_signals`, `incentive_programs`, `crew_costs`, `comparable_productions`, `grant_opportunities`, `film_festivals`, `territory_watchlist`, `b2b_clients`
 
-Schema source: `src/types/supabase.ts`
+Schema source: `schema SQL files`
 
 ---
 

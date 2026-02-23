@@ -46,10 +46,11 @@ Prodculator is a professional platform for film producers to upload scripts and 
 - **React Router** - Navigation
 
 ### Backend
-- **Supabase** - Database & Authentication
+- **FastAPI Backend API** - Auth, data access, business logic, and file workflows
+- **managed database** - Database/Auth infrastructure used by backend only
 - **Stripe** - Payment processing
-- **OpenAI** - Script analysis (Scripteligence)
-- **AWS S3** - File storage (scripts, PDFs)
+- **OpenAI** - Script analysis via backend
+- **AWS S3** - File storage via backend
 
 ### Deployment
 - **Vercel** - Application hosting
@@ -71,10 +72,11 @@ prodculator/
 │   │   ├── pages/           # Static pages (FAQ, Terms, etc.)
 │   │   └── App.tsx          # Main app component
 │   ├── services/            # Backend services
-│   │   ├── supabase.service.ts
+│   │   ├── auth.service.ts
+│   │   ├── database.service.ts
+│   │   ├── api.ts
 │   │   ├── stripe.service.ts
-│   │   ├── openai.service.ts
-│   │   └── report-generator.service.ts
+│   │   └── script-analysis.service.ts
 │   ├── types/               # TypeScript types
 │   ├── utils/               # Utility functions
 │   └── styles/              # Global styles
@@ -88,22 +90,15 @@ prodculator/
 Required environment variables (set in Vercel):
 
 ```env
-# Supabase
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
+# App / backend routing
+VITE_API_BASE_URL=https://api.your-backend-domain.com
 
 # Stripe
-VITE_STRIPE_PUBLIC_KEY_USD=pk_live_...
-VITE_STRIPE_PUBLIC_KEY_GBP=pk_live_...
+VITE_STRIPE_PUBLISHABLE_KEY=pk_live_or_test_...
 
-# OpenAI
-VITE_OPENAI_API_KEY=sk-proj-...
-
-# AWS S3
-VITE_AWS_S3_BUCKET=prodculator-scripts-prod
-VITE_AWS_REGION=us-east-1
-VITE_AWS_ACCESS_KEY_ID=AKIA...
-VITE_AWS_SECRET_ACCESS_KEY=...
+# Optional frontend-only keys
+VITE_GOOGLE_MAPS_API_KEY=...
+VITE_TMDB_API_KEY=...
 ```
 
 ## 🚀 Local Development
@@ -167,7 +162,7 @@ Add all variables from `.env.local`
 
 ## 🗄️ Database Setup
 
-### Supabase Schema
+### managed database Schema
 
 The platform uses the following main tables:
 - `users` - User accounts
@@ -184,10 +179,10 @@ The platform uses the following main tables:
 
 ```bash
 # Apply migrations
-supabase db push
+your_backend_db_cli db push
 
 # Reset database (dev only)
-supabase db reset
+your_backend_db_cli db reset
 ```
 
 ## 💳 Stripe Integration
@@ -232,7 +227,8 @@ Events to listen for:
 ## 🔐 Security
 
 - Environment variables never committed to Git
-- Supabase Row Level Security (RLS) enabled
+- Frontend talks only to backend API (no direct database vendor calls)
+- database row-level security (RLS) enforced by backend data access
 - Stripe webhook signature verification
 - Rate limiting on API endpoints
 - Email gating for abuse prevention
