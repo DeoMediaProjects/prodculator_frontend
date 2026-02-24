@@ -78,13 +78,13 @@ type EmailData =
 
 /**
  * Email service class - client-side interface
- * Actual API calls should be made through Supabase Edge Functions or backend API
+ * Actual API calls should be made through backend functions or backend API
  */
 export class EmailService {
   private apiEndpoint: string;
 
   constructor() {
-    // This should point to your backend API endpoint or Supabase Edge Function
+    // This should point to your backend API endpoint or backend function
     this.apiEndpoint = `${API_CONFIG.app.apiBaseURL}/api/emails`;
   }
 
@@ -174,7 +174,7 @@ export const emailService = new EmailService();
 
 /**
  * SERVER-SIDE ONLY: SendGrid Email Templates
- * These functions should only be called from server-side code (Supabase Edge Functions, backend API)
+ * These functions should only be called from server-side code (backend functions, backend API)
  */
 
 /**

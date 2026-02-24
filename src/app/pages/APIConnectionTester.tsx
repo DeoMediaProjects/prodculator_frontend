@@ -136,7 +136,7 @@ export function APIConnectionTester() {
             <Alert className="bg-gray-900 border-yellow-500">
               <AlertCircle className="h-4 w-4 text-yellow-500" />
               <AlertDescription className="text-gray-300">
-                Secret provider keys (OpenAI, Supabase service role, Stripe secret) are server-side only and are intentionally not exposed in this page.
+                Secret provider keys (OpenAI, backend service credentials, Stripe secret) are server-side only and are intentionally not exposed in this page.
               </AlertDescription>
             </Alert>
 
