@@ -218,7 +218,7 @@ export function B2BClientManager() {
   };
 
   const handleSaveClient = () => {
-    // In production: call Supabase to save client
+    // In production: call backend API to save client
     handleCloseDialogs();
   };
 

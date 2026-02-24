@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authService as supabaseAuthService, AuthUser as SupabaseAuthUser } from '@/services/auth.service';
+import { authService } from '@/services/auth.service';
 
 // Admin permission levels
 export type AdminRole = 'master_admin' | 'senior_admin' | 'data_admin' | 'support_admin';
@@ -147,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Check for existing session on mount
   useEffect(() => {
     const checkSession = async () => {
-      const currentUser = await supabaseAuthService.getCurrentUser();
+      const currentUser = await authService.getCurrentUser();
       if (currentUser) {
         setUser({
           email: currentUser.email,
@@ -160,7 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkSession();
 
     // Subscribe to auth state changes
-    const { data: authListener } = supabaseAuthService.onAuthStateChange((user) => {
+    const { data: authListener } = authService.onAuthStateChange((user) => {
       if (user) {
         setUser({
           email: user.email,
@@ -187,7 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const userLogin = async (email: string, password: string): Promise<boolean> => {
-    const { user: authUser, error } = await supabaseAuthService.signIn(email, password);
+    const { user: authUser, error } = await authService.signIn(email, password);
     
     if (error || !authUser) {
       console.error('Login error:', error);
@@ -211,7 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     company?: string; 
     role?: string; 
   }): Promise<boolean> => {
-    const { user: authUser, error } = await supabaseAuthService.signUp(
+    const { user: authUser, error } = await authService.signUp(
       userData.email,
       userData.password,
       {
@@ -237,7 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const userLogout = async () => {
-    await supabaseAuthService.signOut();
+    await authService.signOut();
     setUser(null);
   };
 

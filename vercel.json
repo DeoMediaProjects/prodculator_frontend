@@ -20,16 +20,5 @@
         }
       ]
     }
-  ],
-  "env": {
-    "VITE_SUPABASE_URL": "@vite_supabase_url",
-    "VITE_SUPABASE_ANON_KEY": "@vite_supabase_anon_key",
-    "VITE_STRIPE_PUBLIC_KEY_USD": "@vite_stripe_public_key_usd",
-    "VITE_STRIPE_PUBLIC_KEY_GBP": "@vite_stripe_public_key_gbp",
-    "VITE_OPENAI_API_KEY": "@vite_openai_api_key",
-    "VITE_AWS_S3_BUCKET": "@vite_aws_s3_bucket",
-    "VITE_AWS_REGION": "@vite_aws_region",
-    "VITE_AWS_ACCESS_KEY_ID": "@vite_aws_access_key_id",
-    "VITE_AWS_SECRET_ACCESS_KEY": "@vite_aws_secret_access_key"
-  }
+  ]
 }

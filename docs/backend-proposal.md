@@ -3,7 +3,7 @@ Prodculator Backend Implementation Proposal
 
 Executive Summary
 
-Prodculator currently operates as a frontend-only application that communicates directly with third-party services (Supabase, OpenAI, Stripe) from the user's browser. While this allowed for rapid prototyping, it introduces critical security vulnerabilities and architectural limitations that must be resolved before serving real users and processing payments.
+Prodculator currently operates as a frontend-only application that communicates directly with third-party services (managed database, OpenAI, Stripe) from the user's browser. While this allowed for rapid prototyping, it introduces critical security vulnerabilities and architectural limitations that must be resolved before serving real users and processing payments.
 
 This proposal outlines the implementation of a dedicated backend server to sit between the frontend and all external services, resolving security issues, improving reliability, and enabling features that are not possible with a browser-only architecture.
 
@@ -32,7 +32,7 @@ A backend server enforces permissions on every request before touching the datab
 
 3. Payment Security
 
-Stripe webhook handling currently runs through Supabase Edge Functions with limited error handling. The backend will:
+Stripe webhook handling currently runs through backend functions with limited error handling. The backend will:
 
 - Verify Stripe webhook signatures properly to prevent spoofed payment events
 - Ensure subscription state is always consistent with Stripe's records
@@ -65,11 +65,11 @@ Technical Approach
 
 - Language: Python
 - Framework: FastAPI (modern, high-performance, automatic API documentation)
-- Database: Supabase (Postgres) — no database migration needed, existing schema is preserved
+- Database: managed database (Postgres) — no database migration needed, existing schema is preserved
 - Deployment: Separate service alongside the existing frontend
 - Authentication: All auth flows route through the backend; frontend never touches the database directly
 
-The existing 13 database tables remain unchanged. The backend sits between the frontend and all external services (Supabase, OpenAI, Stripe, SendGrid).
+The existing 13 database tables remain unchanged. The backend sits between the frontend and all external services (managed database, OpenAI, Stripe, SendGrid).
 
 
 4-Week Delivery Schedule
@@ -120,7 +120,7 @@ Deliverables:
 | 4.1 | Admin API with server-side permissions | All admin CRUD operations (incentives, crew costs, comparables, grants, festivals) enforced server-side
 | 4.2 | Business metrics API     | Admin dashboard metrics (total users, active subscriptions, MRR, conversion rate, reports this month)
 | 4.3 | Production signals API   | Production intelligence tracking and trend analytics for the admin dashboard                        
-| 4.4 | Frontend migration       | Replace all direct Supabase/OpenAI calls with backend API calls; remove exposed keys from frontend  
+| 4.4 | Frontend migration       | Replace all direct managed database/OpenAI calls with backend API calls; remove exposed keys from frontend  
 | 4.5 | Integration testing      | End-to-end tests covering auth, report generation, payments, and admin operations                   
 | 4.6 | Deployment configuration | Dockerized backend ready for deployment; updated frontend deployment config                         
 
@@ -141,7 +141,7 @@ What Doesn't Change
 
 - Database schema — all 13 existing tables remain as-is
 - Frontend UI/UX — no visual changes; users won't notice the migration
-- Supabase — continues to serve as the Postgres database and file storage
+- managed database — continues to serve as the Postgres database and file storage
 - Stripe pricing — same plans, same prices, same checkout flow
 
 
