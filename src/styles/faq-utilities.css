@@ -1,0 +1,156 @@
+.faq-page {
+  --gold: #d4af37;
+  --gold-light: #f4cf67;
+  --gray-100: #f3f4f6;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-600: #4b5563;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+  --amber-300: #fcd34d;
+  --amber-400: #fbbf24;
+  --amber-500: #f59e0b;
+  --red-400: #f87171;
+  --green-400: #4ade80;
+}
+
+.faq-page .min-h-screen { min-height: 100vh; }
+.faq-page .bg-black { background-color: #000; }
+.faq-page .bg-black-50 { background-color: rgba(0, 0, 0, 0.5); }
+.faq-page .bg-amber-900-20 { background-color: rgba(120, 53, 15, 0.2); }
+.faq-page .bg-gold { background-color: var(--gold); }
+.faq-page .bg-gradient-to-b { background-image: linear-gradient(to bottom, var(--from-color), var(--to-color)); }
+.faq-page .bg-gradient-to-br { background-image: linear-gradient(to bottom right, var(--from-color), var(--to-color)); }
+.faq-page .from-black { --from-color: #000; }
+.faq-page .from-gray-900 { --from-color: var(--gray-900); }
+.faq-page .to-black { --to-color: #000; }
+.faq-page .to-gray-900 { --to-color: var(--gray-900); }
+
+.faq-page .text-white { color: #fff; }
+.faq-page .text-black { color: #000; }
+.faq-page .text-gold { color: var(--gold); }
+.faq-page .text-gray-100 { color: #f3f4f6; }
+.faq-page .text-gray-300 { color: var(--gray-300); }
+.faq-page .text-gray-400 { color: var(--gray-400); }
+.faq-page .text-amber-300 { color: var(--amber-300); }
+.faq-page .text-amber-400 { color: var(--amber-400); }
+.faq-page .text-amber-500 { color: var(--amber-500); }
+.faq-page .text-red-400 { color: var(--red-400); }
+.faq-page .text-green-400 { color: var(--green-400); }
+
+.faq-page .hover-text-gold-light:hover { color: var(--gold-light); }
+.faq-page .hover-text-black:hover { color: #000; }
+.faq-page .hover-text-white:hover { color: #fff; }
+.faq-page .hover-bg-gold:hover { background-color: var(--gold); }
+.faq-page .hover-bg-gold-light:hover { background-color: var(--gold-light); }
+.faq-page .hover-bg-gray-800-30:hover { background-color: rgba(31, 41, 55, 0.3); }
+.faq-page .hover-bg-gray-800-50:hover { background-color: rgba(31, 41, 55, 0.5); }
+
+.faq-page .border { border: 1px solid transparent; }
+.faq-page .border-2 { border-width: 2px; border-style: solid; }
+.faq-page .border-b { border-bottom: 1px solid; }
+.faq-page .border-t { border-top: 1px solid; }
+.faq-page .border-l-4 { border-left: 4px solid; }
+.faq-page .border-gray-800 { border-color: var(--gray-800); }
+.faq-page .border-amber-500 { border-color: var(--amber-500); }
+.faq-page .border-gold { border-color: var(--gold); }
+.faq-page .last\:border-b-0:last-child { border-bottom-width: 0; }
+
+.faq-page .rounded-full { border-radius: 9999px; }
+.faq-page .rounded-lg { border-radius: 0.5rem; }
+
+.faq-page .flex { display: flex; }
+.faq-page .inline-flex { display: inline-flex; }
+.faq-page .flex-col { flex-direction: column; }
+.faq-page .flex-1 { flex: 1 1 0%; }
+.faq-page .flex-shrink-0 { flex-shrink: 0; }
+.faq-page .items-center { align-items: center; }
+.faq-page .items-start { align-items: flex-start; }
+.faq-page .justify-center { justify-content: center; }
+.faq-page .justify-between { justify-content: space-between; }
+
+.faq-page .w-full { width: 100%; }
+.faq-page .w-2 { width: 0.5rem; }
+.faq-page .w-4 { width: 1rem; }
+.faq-page .w-5 { width: 1.25rem; }
+.faq-page .w-8 { width: 2rem; }
+.faq-page .w-12 { width: 3rem; }
+.faq-page .h-2 { height: 0.5rem; }
+.faq-page .h-4 { height: 1rem; }
+.faq-page .h-5 { height: 1.25rem; }
+.faq-page .h-8 { height: 2rem; }
+.faq-page .h-12 { height: 3rem; }
+
+.faq-page .max-w-3xl { max-width: 48rem; }
+.faq-page .max-w-4xl { max-width: 56rem; }
+.faq-page .max-w-6xl { max-width: 72rem; }
+.faq-page .mx-auto { margin-left: auto; margin-right: auto; }
+.faq-page .text-center { text-align: center; }
+.faq-page .text-left { text-align: left; }
+.faq-page .leading-relaxed { line-height: 1.625; }
+
+.faq-page .p-4 { padding: 1rem; }
+.faq-page .px-4 { padding-left: 1rem; padding-right: 1rem; }
+.faq-page .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+.faq-page .px-8 { padding-left: 2rem; padding-right: 2rem; }
+.faq-page .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.faq-page .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+.faq-page .py-6 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+.faq-page .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+.faq-page .py-16 { padding-top: 4rem; padding-bottom: 4rem; }
+.faq-page .pt-8 { padding-top: 2rem; }
+.faq-page .pb-4 { padding-bottom: 1rem; }
+.faq-page .pl-6 { padding-left: 1.5rem; }
+.faq-page .pl-14 { padding-left: 3.5rem; }
+
+.faq-page .mb-2 { margin-bottom: 0.5rem; }
+.faq-page .mb-3 { margin-bottom: 0.75rem; }
+.faq-page .mb-4 { margin-bottom: 1rem; }
+.faq-page .mb-6 { margin-bottom: 1.5rem; }
+.faq-page .mb-8 { margin-bottom: 2rem; }
+.faq-page .mt-1 { margin-top: 0.25rem; }
+.faq-page .mt-3 { margin-top: 0.75rem; }
+.faq-page .mt-12 { margin-top: 3rem; }
+.faq-page .ml-4 { margin-left: 1rem; }
+
+.faq-page .gap-2 { gap: 0.5rem; }
+.faq-page .gap-3 { gap: 0.75rem; }
+.faq-page .gap-4 { gap: 1rem; }
+.faq-page .gap-6 { gap: 1.5rem; }
+
+.faq-page .space-y-1 > * + * { margin-top: 0.25rem; }
+.faq-page .space-y-2 > * + * { margin-top: 0.5rem; }
+.faq-page .space-y-3 > * + * { margin-top: 0.75rem; }
+.faq-page .space-y-6 > * + * { margin-top: 1.5rem; }
+
+.faq-page .text-sm { font-size: 0.875rem; }
+.faq-page .text-lg { font-size: 1.125rem; }
+.faq-page .text-xl { font-size: 1.25rem; }
+.faq-page .text-2xl { font-size: 1.5rem; }
+.faq-page .text-3xl { font-size: 1.875rem; }
+.faq-page .text-4xl { font-size: 2.25rem; }
+.faq-page .font-medium { font-weight: 500; }
+.faq-page .font-semibold { font-weight: 600; }
+.faq-page .font-bold { font-weight: 700; }
+
+.faq-page .list-disc { list-style-type: disc; }
+.faq-page .list-decimal { list-style-type: decimal; }
+
+.faq-page .sticky { position: sticky; }
+.faq-page .top-0 { top: 0; }
+.faq-page .z-50 { z-index: 50; }
+.faq-page .overflow-hidden { overflow: hidden; }
+.faq-page .backdrop-blur-sm { backdrop-filter: blur(4px); }
+.faq-page .transition-colors { transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease; }
+.faq-page .transition-transform { transition: transform 150ms ease; }
+.faq-page .rotate-180 { transform: rotate(180deg); }
+.faq-page .bg-gray-600 { background-color: var(--gray-600); }
+
+@media (min-width: 640px) {
+  .faq-page .sm\:flex-row { flex-direction: row; }
+}
+
+@media (min-width: 768px) {
+  .faq-page .md\:flex-row { flex-direction: row; }
+  .faq-page .md\:text-5xl { font-size: 3rem; }
+}

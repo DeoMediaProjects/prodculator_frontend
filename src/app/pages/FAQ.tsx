@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronDown, HelpCircle, Shield, Globe, DollarSign, Film, BarChart, Lock, Mail } from 'lucide-react';
+import '@/styles/faq-utilities.css';
 
 interface FAQItem {
   question: string;
@@ -308,19 +309,19 @@ export default function FAQ() {
               <p>We cover <strong>15 international territories</strong> with full four-layer financial analysis:</p>
               <div className="space-y-2">
                 <div>
-                  <p className="font-semibold text-[#D4AF37]">Europe:</p>
+                  <p className="font-semibold text-gold">Europe:</p>
                   <p className="text-sm">United Kingdom (AVEC/IFTC + regional stacking: Scotland, Wales, Northern Ireland), France (TRIP — 30%, 40% VFX), Ireland (Section 481 — 32%), Malta (Cash Rebate — 40%), Hungary (Film Tax Rebate — 30%), Czech Republic (Cash Rebate — 20–28%), Spain (20–25% mainland, 30–45% Canary Islands), Italy (Italian Tax Credit — 40%)</p>
                 </div>
                 <div>
-                  <p className="font-semibold text-[#D4AF37]">Americas:</p>
+                  <p className="font-semibold text-gold">Americas:</p>
                   <p className="text-sm">Georgia USA (Film Tax Credit — 30% + 10% VFX), New Mexico USA (25–35%), British Columbia Canada (28–35%)</p>
                 </div>
                 <div>
-                  <p className="font-semibold text-[#D4AF37]">Rest of world:</p>
+                  <p className="font-semibold text-gold">Rest of world:</p>
                   <p className="text-sm">Australia (16.5–30% via Screen Australia and state agencies), New Zealand (20–25%), South Africa (DTI/NFVF — 35%, with reliability advisory)</p>
                 </div>
                 <div>
-                  <p className="font-semibold text-[#D4AF37]">Emerging tier:</p>
+                  <p className="font-semibold text-gold">Emerging tier:</p>
                   <p className="text-sm">Serbia and Romania are tracked and included in our territory database. Incentive programmes in these territories are flagged for verification due to programme changes in 2024–2025.</p>
                 </div>
               </div>
@@ -489,7 +490,7 @@ export default function FAQ() {
           answer: (
             <div className="space-y-2">
               <p>
-                We are currently exploring an educational access programme. If you represent a film school, emerging producer scheme, or non-profit film organisation, contact us at <a href="mailto:hello@prodculator.com" className="text-[#D4AF37] hover:text-[#F4CF67]">hello@prodculator.com</a> to discuss options.
+                We are currently exploring an educational access programme. If you represent a film school, emerging producer scheme, or non-profit film organisation, contact us at <a href="mailto:hello@prodculator.com" className="text-gold hover-text-gold-light">hello@prodculator.com</a> to discuss options.
               </p>
             </div>
           ),
@@ -504,7 +505,7 @@ export default function FAQ() {
           question: 'Is Prodculator providing legal, tax, or financial advice?',
           answer: (
             <div className="space-y-3">
-              <div className="bg-amber-900/20 border-l-4 border-amber-500 p-4">
+              <div className="bg-amber-900-20 border-l-4 border-amber-500 p-4">
                 <p className="font-bold text-amber-400 text-lg mb-3">
                   NO. Prodculator does NOT provide professional legal, tax, financial, or production advice.
                 </p>
@@ -524,7 +525,7 @@ export default function FAQ() {
                 </ul>
               </div>
               <p className="text-sm text-gray-400">
-                See our <a href="/terms-of-service" className="text-[#D4AF37] hover:text-[#F4CF67]">Terms of Service</a> Section 9 for complete legal disclaimers.
+                See our <a href="/terms-of-service" className="text-gold hover-text-gold-light">Terms of Service</a> Section 9 for complete legal disclaimers.
               </p>
             </div>
           ),
@@ -598,10 +599,10 @@ export default function FAQ() {
           answer: (
             <div className="space-y-3">
               <ul className="list-disc pl-6 space-y-1">
-                <li><strong>Terms of Service:</strong> <a href="/terms-of-service" className="text-[#D4AF37] hover:text-[#F4CF67]">prodculator.com/terms</a></li>
-                <li><strong>Privacy Policy:</strong> <a href="/privacy-policy" className="text-[#D4AF37] hover:text-[#F4CF67]">prodculator.com/privacy</a></li>
-                <li><strong>Acceptable Use Policy:</strong> <a href="/acceptable-use" className="text-[#D4AF37] hover:text-[#F4CF67]">prodculator.com/acceptable-use</a></li>
-                <li><strong>Data Attribution Guide:</strong> <a href="/data-attribution" className="text-[#D4AF37] hover:text-[#F4CF67]">prodculator.com/data-attribution</a></li>
+                <li><strong>Terms of Service:</strong> <a href="/terms-of-service" className="text-gold hover-text-gold-light">prodculator.com/terms</a></li>
+                <li><strong>Privacy Policy:</strong> <a href="/privacy-policy" className="text-gold hover-text-gold-light">prodculator.com/privacy</a></li>
+                <li><strong>Acceptable Use Policy:</strong> <a href="/acceptable-use" className="text-gold hover-text-gold-light">prodculator.com/acceptable-use</a></li>
+                <li><strong>Data Attribution Guide:</strong> <a href="/data-attribution" className="text-gold hover-text-gold-light">prodculator.com/data-attribution</a></li>
               </ul>
               <p className="text-sm text-gray-400 mt-3">
                 Prodculator is operated by <strong>Deo Media Limited, Company Number 15426752</strong>, registered in England and Wales. Our privacy practices comply with UK GDPR and, where applicable, EU GDPR.
@@ -614,21 +615,21 @@ export default function FAQ() {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="faq-page min-h-screen bg-black text-white">
       {/* Header */}
-      <header className="border-b border-gray-800 bg-black/50 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-gray-800 bg-black-50 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <a href="/" className="text-2xl font-bold text-[#D4AF37] hover:text-[#F4CF67] transition-colors">
+              <a href="/" className="text-2xl font-bold text-gold hover-text-gold-light transition-colors">
                 Prodculator
               </a>
             </div>
             <nav className="flex gap-6">
-              <a href="/" className="text-gray-300 hover:text-white transition-colors">Home</a>
-              <a href="/pricing" className="text-gray-300 hover:text-white transition-colors">Pricing</a>
-              <a href="/dashboard" className="text-gray-300 hover:text-white transition-colors">Dashboard</a>
-              <a href="/login" className="text-gray-300 hover:text-white transition-colors">Login</a>
+              <a href="/" className="text-gray-300 hover-text-white transition-colors">Home</a>
+              <a href="/pricing" className="text-gray-300 hover-text-white transition-colors">Pricing</a>
+              <a href="/dashboard" className="text-gray-300 hover-text-white transition-colors">Dashboard</a>
+              <a href="/login" className="text-gray-300 hover-text-white transition-colors">Login</a>
             </nav>
           </div>
         </div>
@@ -638,14 +639,14 @@ export default function FAQ() {
       <section className="border-b border-gray-800 bg-gradient-to-b from-black to-gray-900">
         <div className="max-w-6xl mx-auto px-4 py-16 text-center">
           <div className="inline-flex items-center gap-2 mb-6">
-            <HelpCircle className="w-8 h-8 text-[#D4AF37]" />
+            <HelpCircle className="w-8 h-8 text-gold" />
             <h1 className="text-4xl md:text-5xl font-bold">
               Frequently Asked Questions
             </h1>
           </div>
           <p className="text-xl text-gray-300 max-w-3xl mx-auto">
             Everything you need to know about Prodculator's Scripteligence AI, from getting started to advanced features.
-            Can't find what you're looking for? <a href="mailto:support@prodculator.com" className="text-[#D4AF37] hover:text-[#F4CF67]">Contact us</a>.
+            Can't find what you're looking for? <a href="mailto:support@prodculator.com" className="text-gold hover-text-gold-light">Contact us</a>.
           </p>
         </div>
       </section>
@@ -662,10 +663,10 @@ export default function FAQ() {
                 {/* Section Header */}
                 <button
                   onClick={() => setOpenSection(openSection === sectionIndex ? null : sectionIndex)}
-                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-800/50 transition-colors"
+                  className="w-full px-6 py-4 flex items-center justify-between hover-bg-gray-800-50 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="text-[#D4AF37]">
+                    <div className="text-gold">
                       {section.icon}
                     </div>
                     <h2 className="text-xl font-semibold text-left">{section.title}</h2>
@@ -690,11 +691,11 @@ export default function FAQ() {
                           {/* Question */}
                           <button
                             onClick={() => toggleQuestion(sectionIndex, itemIndex)}
-                            className="w-full px-6 py-4 flex items-start justify-between hover:bg-gray-800/30 transition-colors text-left"
+                            className="w-full px-6 py-4 flex items-start justify-between hover-bg-gray-800-30 transition-colors text-left"
                           >
                             <div className="flex items-start gap-3 flex-1">
                               <div className="mt-1">
-                                <div className={`w-2 h-2 rounded-full ${isOpen ? 'bg-[#D4AF37]' : 'bg-gray-600'}`} />
+                                <div className={`w-2 h-2 rounded-full ${isOpen ? 'bg-gold' : 'bg-gray-600'}`} />
                               </div>
                               <span className="font-medium text-gray-100">{item.question}</span>
                             </div>
@@ -731,7 +732,7 @@ export default function FAQ() {
       {/* Contact CTA */}
       <section className="border-t border-gray-800 bg-gradient-to-b from-gray-900 to-black">
         <div className="max-w-4xl mx-auto px-4 py-16 text-center">
-          <Mail className="w-12 h-12 text-[#D4AF37] mx-auto mb-6" />
+          <Mail className="w-12 h-12 text-gold mx-auto mb-6" />
           <h2 className="text-3xl font-bold mb-4">Still Have Questions?</h2>
           <p className="text-xl text-gray-300 mb-8">
             Our team is here to help. Get in touch and we'll respond within 24 hours.
@@ -739,14 +740,14 @@ export default function FAQ() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
               href="mailto:support@prodculator.com"
-              className="px-8 py-3 bg-[#D4AF37] text-black font-semibold rounded-lg hover:bg-[#F4CF67] transition-colors inline-flex items-center justify-center gap-2"
+              className="px-8 py-3 bg-gold text-black font-semibold rounded-lg hover-bg-gold-light transition-colors inline-flex items-center justify-center gap-2"
             >
               <Mail className="w-5 h-5" />
               Email Support
             </a>
             <a
               href="/dashboard"
-              className="px-8 py-3 border-2 border-[#D4AF37] text-[#D4AF37] font-semibold rounded-lg hover:bg-[#D4AF37] hover:text-black transition-colors"
+              className="px-8 py-3 border-2 border-gold text-gold font-semibold rounded-lg hover-bg-gold hover-text-black transition-colors"
             >
               Go to Dashboard
             </a>
@@ -771,12 +772,12 @@ export default function FAQ() {
               © 2025 Deo Media Limited. All rights reserved.
             </p>
             <nav className="flex gap-6 text-sm">
-              <a href="/terms-of-service" className="text-gray-400 hover:text-white transition-colors">Terms of Service</a>
-              <a href="/privacy-policy" className="text-gray-400 hover:text-white transition-colors">Privacy Policy</a>
-              <a href="/acceptable-use" className="text-gray-400 hover:text-white transition-colors">Acceptable Use</a>
-              <a href="/b2b-solutions" className="text-gray-400 hover:text-white transition-colors">B2B Solutions</a>
-              <a href="/faq" className="text-gray-400 hover:text-white transition-colors">FAQ</a>
-              <a href="mailto:info@prodculator.com" className="text-gray-400 hover:text-white transition-colors">Contact</a>
+              <a href="/terms-of-service" className="text-gray-400 hover-text-white transition-colors">Terms of Service</a>
+              <a href="/privacy-policy" className="text-gray-400 hover-text-white transition-colors">Privacy Policy</a>
+              <a href="/acceptable-use" className="text-gray-400 hover-text-white transition-colors">Acceptable Use</a>
+              <a href="/b2b-solutions" className="text-gray-400 hover-text-white transition-colors">B2B Solutions</a>
+              <a href="/faq" className="text-gray-400 hover-text-white transition-colors">FAQ</a>
+              <a href="mailto:info@prodculator.com" className="text-gray-400 hover-text-white transition-colors">Contact</a>
             </nav>
           </div>
         </div>
