@@ -1,9 +1,19 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
-import { Button } from '@/app/components/ui/button';
-import { Alert, AlertDescription } from '@/app/components/ui/alert';
-import { Badge } from '@/app/components/ui/badge';
-import { CheckCircle2, XCircle, AlertCircle, ExternalLink } from 'lucide-react';
+import {
+  Alert,
+  AlertTitle,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  Chip,
+  Link,
+  Stack,
+  Typography,
+} from '@mui/material';
+import Grid from '@mui/material/Grid';
+import { CheckCircle, Error as ErrorIcon, InfoOutlined, Launch } from '@mui/icons-material';
 import { API_CONFIG, getAPIStatus } from '@/config/api.config';
 
 /**
@@ -99,154 +109,189 @@ export function APIConnectionTester() {
     setTesting(false);
   };
 
-  const getStatusIcon = (active: boolean, tested?: any) => {
+  const getStatusChip = (active: boolean, tested?: any) => {
     if (tested === undefined) {
-      return active ? <Badge className="bg-blue-500">Configured</Badge> : <Badge variant="outline">Not Configured</Badge>;
-    }
-
-    if (tested.success) {
       return (
-        <Badge className="bg-green-500">
-          <CheckCircle2 className="w-3 h-3 mr-1" />Working
-        </Badge>
+        <Chip
+          size="small"
+          label={active ? 'Configured' : 'Not Configured'}
+          color={active ? 'info' : 'default'}
+          variant={active ? 'filled' : 'outlined'}
+        />
       );
     }
 
-    return (
-      <Badge variant="destructive">
-        <XCircle className="w-3 h-3 mr-1" />Failed
-      </Badge>
-    );
+    if (tested.success) {
+      return <Chip size="small" icon={<CheckCircle />} label="Working" color="success" />;
+    }
+
+    return <Chip size="small" icon={<ErrorIcon />} label="Failed" color="error" />;
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-white">API Connection Tester</h1>
-          <p className="text-gray-400">Validate backend-first frontend integrations</p>
-        </div>
+    <Box sx={{ minHeight: '100vh', bgcolor: '#000000', color: '#fff', p: 4 }}>
+      <Box sx={{ maxWidth: 1100, mx: 'auto' }}>
+        <Box sx={{ textAlign: 'center', mb: 4 }}>
+          <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+            API Connection Tester
+          </Typography>
+          <Typography sx={{ color: '#a0a0a0' }}>Validate backend-first frontend integrations</Typography>
+        </Box>
 
-        <Card className="bg-gray-800 border-gray-700">
-          <CardHeader>
-            <CardTitle className="text-white">Configuration Status</CardTitle>
-            <CardDescription className="text-gray-400">Only frontend-safe values are checked here</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Alert className="bg-gray-900 border-yellow-500">
-              <AlertCircle className="h-4 w-4 text-yellow-500" />
-              <AlertDescription className="text-gray-300">
-                Secret provider keys (OpenAI, backend service credentials, Stripe secret) are server-side only and are intentionally not exposed in this page.
-              </AlertDescription>
+        <Card sx={{ mb: 3, bgcolor: '#1f1f1f', border: '1px solid #333' }}>
+          <CardHeader
+            title="Configuration Status"
+            subheader="Only frontend-safe values are checked here"
+            slotProps={{ title: { sx: { color: '#fff' } }, subheader: { sx: { color: '#a0a0a0' } } }}
+          />
+          <CardContent>
+            <Alert icon={<InfoOutlined />} severity="warning" sx={{ mb: 3 }}>
+              <AlertTitle>Server-side secrets</AlertTitle>
+              Secret provider keys (OpenAI, backend service credentials, Stripe secret) are server-side only and are
+              intentionally not exposed in this page.
             </Alert>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-4 bg-gray-900 rounded-lg">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-white">Backend API</h3>
-                  <p className="text-sm text-gray-400">FastAPI health and routing</p>
-                  {testResults.backend && <p className="text-xs text-gray-500 mt-1">{testResults.backend.message}</p>}
-                </div>
-                <div className="flex items-center gap-2">
-                  {getStatusIcon(apiStatus.backend.active, testResults.backend)}
-                  <Button size="sm" onClick={() => runTest('backend', testBackend)} disabled={testing || !apiStatus.backend.active}>
-                    Test
-                  </Button>
-                </div>
-              </div>
+            <Stack spacing={2}>
+              {[
+                {
+                  key: 'backend',
+                  title: 'Backend API',
+                  description: 'FastAPI health and routing',
+                  active: apiStatus.backend.active,
+                  fn: testBackend,
+                },
+                {
+                  key: 'stripe',
+                  title: 'Stripe',
+                  description: 'Checkout client configuration',
+                  active: apiStatus.stripe.active,
+                  fn: testStripe,
+                },
+                {
+                  key: 'googleMaps',
+                  title: 'Google Maps',
+                  description: 'Frontend geospatial lookups',
+                  active: apiStatus.googleMaps.active,
+                  fn: testGoogleMaps,
+                },
+              ].map((item) => (
+                <Box
+                  key={item.key}
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    p: 2,
+                    bgcolor: '#111',
+                    borderRadius: 1,
+                    border: '1px solid #2a2a2a',
+                  }}
+                >
+                  <Box>
+                    <Typography sx={{ fontWeight: 600 }}>{item.title}</Typography>
+                    <Typography variant="body2" sx={{ color: '#a0a0a0' }}>
+                      {item.description}
+                    </Typography>
+                    {testResults[item.key] && (
+                      <Typography variant="caption" sx={{ color: '#8a8a8a' }}>
+                        {testResults[item.key].message}
+                      </Typography>
+                    )}
+                  </Box>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    {getStatusChip(item.active, testResults[item.key])}
+                    <Button
+                      variant="outlined"
+                      onClick={() => runTest(item.key, item.fn)}
+                      disabled={testing || !item.active}
+                    >
+                      Test
+                    </Button>
+                  </Stack>
+                </Box>
+              ))}
+            </Stack>
 
-              <div className="flex items-center justify-between p-4 bg-gray-900 rounded-lg">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-white">Stripe</h3>
-                  <p className="text-sm text-gray-400">Checkout client configuration</p>
-                  {testResults.stripe && <p className="text-xs text-gray-500 mt-1">{testResults.stripe.message}</p>}
-                </div>
-                <div className="flex items-center gap-2">
-                  {getStatusIcon(apiStatus.stripe.active, testResults.stripe)}
-                  <Button size="sm" onClick={() => runTest('stripe', testStripe)} disabled={testing || !apiStatus.stripe.active}>
-                    Test
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-gray-900 rounded-lg">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-white">Google Maps</h3>
-                  <p className="text-sm text-gray-400">Frontend geospatial lookups</p>
-                  {testResults.googleMaps && (
-                    <p className="text-xs text-gray-500 mt-1">{testResults.googleMaps.message}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {getStatusIcon(apiStatus.googleMaps.active, testResults.googleMaps)}
-                  <Button size="sm" onClick={() => runTest('googleMaps', testGoogleMaps)} disabled={testing || !apiStatus.googleMaps.active}>
-                    Test
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-4">
-              <Button onClick={testAll} disabled={testing} className="flex-1 bg-yellow-600 hover:bg-yellow-700">
+            <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
+              <Button variant="contained" onClick={testAll} disabled={testing} fullWidth>
                 {testing ? 'Testing...' : 'Test All Connections'}
               </Button>
-              <Button variant="outline" onClick={() => setTestResults({})} className="border-gray-600 text-gray-300 hover:bg-gray-800">
+              <Button variant="outlined" onClick={() => setTestResults({})}>
                 Clear Results
               </Button>
-            </div>
+            </Stack>
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-800 border-gray-700">
-          <CardHeader>
-            <CardTitle className="text-white">Frontend Env Example</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-gray-300">
-            <div className="bg-gray-900 p-4 rounded-lg">
-              <p className="text-xs text-gray-400 mb-2">Add to .env.local:</p>
-              <pre className="text-xs text-gray-300 overflow-x-auto">{`VITE_API_BASE_URL=http://localhost:8000
+        <Card sx={{ mb: 3, bgcolor: '#1f1f1f', border: '1px solid #333' }}>
+          <CardHeader title="Frontend Env Example" slotProps={{ title: { sx: { color: '#fff' } } }} />
+          <CardContent>
+            <Box sx={{ bgcolor: '#111', borderRadius: 1, p: 2, mb: 2 }}>
+              <Typography variant="caption" sx={{ color: '#a0a0a0' }}>
+                Add to .env.local:
+              </Typography>
+              <Typography
+                component="pre"
+                sx={{
+                  mt: 1,
+                  fontSize: 12,
+                  color: '#d0d0d0',
+                  overflowX: 'auto',
+                  m: 0,
+                  fontFamily: 'monospace',
+                }}
+              >{`VITE_API_BASE_URL=http://localhost:8000
 VITE_STRIPE_PUBLISHABLE_KEY=pk_test_your_key_here
 VITE_STRIPE_PRICE_PRO_MONTHLY_USD=price_xxx
 VITE_STRIPE_PRICE_PRO_MONTHLY_GBP=price_xxx
 VITE_STRIPE_PRICE_PRODUCER_ANNUAL_USD=price_xxx
 VITE_STRIPE_PRICE_PRODUCER_ANNUAL_GBP=price_xxx
-VITE_GOOGLE_MAPS_API_KEY=AIza...`}</pre>
-            </div>
-
-            <Alert className="bg-yellow-900/20 border-yellow-600">
-              <AlertCircle className="h-4 w-4 text-yellow-500" />
-              <AlertDescription className="text-gray-300">
-                After updating env vars, restart your dev server (<code className="bg-gray-900 px-2 py-1 rounded">npm run dev</code>).
-              </AlertDescription>
+VITE_GOOGLE_MAPS_API_KEY=AIza...`}</Typography>
+            </Box>
+            <Alert severity="info">
+              After updating env vars, restart your dev server (<code>npm run dev</code>).
             </Alert>
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-800 border-gray-700">
-          <CardHeader>
-            <CardTitle className="text-white">Quick Links</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-3">
-            <a href="https://dashboard.stripe.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-3 bg-gray-900 rounded-lg hover:bg-gray-850 transition-colors">
-              <ExternalLink className="w-4 h-4 text-blue-400" />
-              <span className="text-sm text-gray-300">Stripe Dashboard</span>
-            </a>
-            <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-3 bg-gray-900 rounded-lg hover:bg-gray-850 transition-colors">
-              <ExternalLink className="w-4 h-4 text-blue-400" />
-              <span className="text-sm text-gray-300">Google Cloud Console</span>
-            </a>
-            <a href="http://localhost:8000/api/docs" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-3 bg-gray-900 rounded-lg hover:bg-gray-850 transition-colors">
-              <ExternalLink className="w-4 h-4 text-blue-400" />
-              <span className="text-sm text-gray-300">Backend API Docs</span>
-            </a>
-            <a href="/BACKEND_INTEGRATION_GUIDE.md" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-3 bg-gray-900 rounded-lg hover:bg-gray-850 transition-colors">
-              <ExternalLink className="w-4 h-4 text-blue-400" />
-              <span className="text-sm text-gray-300">Integration Guide</span>
-            </a>
+        <Card sx={{ bgcolor: '#1f1f1f', border: '1px solid #333' }}>
+          <CardHeader title="Quick Links" slotProps={{ title: { sx: { color: '#fff' } } }} />
+          <CardContent>
+            <Grid container spacing={2}>
+              {[
+                { label: 'Stripe Dashboard', href: 'https://dashboard.stripe.com' },
+                { label: 'Google Cloud Console', href: 'https://console.cloud.google.com' },
+                { label: 'Backend API Docs', href: 'http://localhost:8000/api/docs' },
+                { label: 'Integration Guide', href: '/BACKEND_INTEGRATION_GUIDE.md' },
+              ].map((item) => (
+                <Grid size={{ xs: 12, sm: 6 }} key={item.label}>
+                  <Link
+                    href={item.href}
+                    target={item.href.startsWith('http') ? '_blank' : undefined}
+                    rel={item.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                    underline="none"
+                    sx={{
+                      p: 2,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      bgcolor: '#111',
+                      border: '1px solid #2a2a2a',
+                      borderRadius: 1,
+                      color: '#ddd',
+                      '&:hover': { bgcolor: '#1a1a1a' },
+                    }}
+                  >
+                    {item.label}
+                    <Launch sx={{ fontSize: 16 }} />
+                  </Link>
+                </Grid>
+              ))}
+            </Grid>
           </CardContent>
         </Card>
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }
 
