@@ -14,7 +14,7 @@ import {
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import { CheckCircle, Error as ErrorIcon, InfoOutlined, Launch } from '@mui/icons-material';
-import { API_CONFIG, getAPIStatus } from '@/config/api.config';
+import { API_CONFIG, getAPIStatus } from '../../config/api.config';
 
 /**
  * API Connection Tester
