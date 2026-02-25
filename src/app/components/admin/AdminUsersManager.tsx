@@ -29,8 +29,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  Switch,
-  FormControlLabel,
 } from '@mui/material';
 import {
   Add,
@@ -42,7 +40,7 @@ import {
   Person,
   AdminPanelSettings,
 } from '@mui/icons-material';
-import { useAuth, AdminRole, ROLE_PERMISSIONS, MOCK_ADMIN_USERS, type AdminUser } from '@/app/contexts/AuthContext';
+import { useAuth, AdminRole, ROLE_PERMISSIONS, type AdminUser } from '@/app/contexts/AuthContext';
 
 const ROLE_LABELS: Record<AdminRole, string> = {
   master_admin: 'Master Admin',
@@ -60,7 +58,7 @@ const ROLE_COLORS: Record<AdminRole, string> = {
 
 export function AdminUsersManager() {
   const { hasAdminPermission, adminUser } = useAuth();
-  const [adminUsers, setAdminUsers] = useState<AdminUser[]>(MOCK_ADMIN_USERS);
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
