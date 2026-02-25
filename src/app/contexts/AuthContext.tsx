@@ -23,7 +23,7 @@ interface User {
   reportsLimit: number;
 }
 
-interface AdminUser {
+export interface AdminUser {
   id: string;
   email: string;
   name: string;
@@ -33,18 +33,26 @@ interface AdminUser {
   lastLogin?: string;
 }
 
+interface SignupData {
+  email: string;
+  password: string;
+  name?: string;
+  company?: string;
+  role?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   setUser: (user: User | null) => void;
   isAuthenticated: boolean;
   hasUsedFreeReport: (email: string) => boolean;
   markFreeReportUsed: (email: string) => void;
-  
+
   // User auth
   userLogin: (email: string, password: string) => Promise<boolean>;
-  userSignup: (userData: any) => Promise<boolean>;
+  userSignup: (userData: SignupData) => Promise<boolean>;
   userLogout: () => void;
-  
+
   // Admin auth
   adminUser: AdminUser | null;
   isAdminAuthenticated: boolean;
@@ -56,7 +64,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Permission presets for each role
-const ROLE_PERMISSIONS: Record<AdminRole, AdminPermissions> = {
+export const ROLE_PERMISSIONS: Record<AdminRole, AdminPermissions> = {
   master_admin: {
     canManageAdmins: true,
     canViewBusinessMetrics: true,
@@ -103,42 +111,6 @@ const ROLE_PERMISSIONS: Record<AdminRole, AdminPermissions> = {
   },
 };
 
-// Mock admin users (in production, this would be in a database)
-const MOCK_ADMIN_USERS: AdminUser[] = [
-  {
-    id: '1',
-    email: 'admin@prodculator.com',
-    name: 'Master Administrator',
-    role: 'master_admin',
-    permissions: ROLE_PERMISSIONS.master_admin,
-    createdAt: '2025-01-01',
-  },
-  {
-    id: '2',
-    email: 'senior@prodculator.com',
-    name: 'Senior Admin',
-    role: 'senior_admin',
-    permissions: ROLE_PERMISSIONS.senior_admin,
-    createdAt: '2025-01-05',
-  },
-  {
-    id: '3',
-    email: 'data@prodculator.com',
-    name: 'Data Admin',
-    role: 'data_admin',
-    permissions: ROLE_PERMISSIONS.data_admin,
-    createdAt: '2025-01-10',
-  },
-  {
-    id: '4',
-    email: 'support@prodculator.com',
-    name: 'Support Admin',
-    role: 'support_admin',
-    permissions: ROLE_PERMISSIONS.support_admin,
-    createdAt: '2025-01-15',
-  },
-];
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [usedEmails, setUsedEmails] = useState<Set<string>>(new Set());
@@ -152,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser({
           email: currentUser.email,
           plan: currentUser.plan || 'free',
-          reportsUsed: 0, // TODO: fetch from database
+          reportsUsed: 0,
           reportsLimit: currentUser.credits_remaining || 0,
         });
       }
@@ -188,7 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const userLogin = async (email: string, password: string): Promise<boolean> => {
     const { user: authUser, error } = await authService.signIn(email, password);
-    
+
     if (error || !authUser) {
       console.error('Login error:', error);
       return false;
@@ -200,17 +172,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       reportsUsed: 0,
       reportsLimit: authUser.credits_remaining || 0,
     });
-    
+
     return true;
   };
 
-  const userSignup = async (userData: { 
-    email: string; 
-    password: string; 
-    name?: string; 
-    company?: string; 
-    role?: string; 
-  }): Promise<boolean> => {
+  const userSignup = async (userData: SignupData): Promise<boolean> => {
     const { user: authUser, error } = await authService.signUp(
       userData.email,
       userData.password,
@@ -242,21 +208,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const adminLogin = async (email: string, password: string): Promise<boolean> => {
-    // Mock authentication - in production, this would call an API
-    // For demo purposes, any password works
-    const foundAdmin = MOCK_ADMIN_USERS.find(
-      admin => admin.email.toLowerCase() === email.toLowerCase()
-    );
+    const { user: authUser, error } = await authService.adminSignIn(email, password);
 
-    if (foundAdmin) {
-      setAdminUser({
-        ...foundAdmin,
-        lastLogin: new Date().toISOString(),
-      });
-      return true;
+    if (error || !authUser) {
+      console.error('Admin login error:', error);
+      return false;
     }
 
-    return false;
+    const role = (authUser.role as AdminRole) || 'support_admin';
+
+    setAdminUser({
+      id: authUser.id,
+      email: authUser.email,
+      name: authUser.name || authUser.email,
+      role,
+      permissions: ROLE_PERMISSIONS[role],
+      createdAt: '',
+      lastLogin: new Date().toISOString(),
+    });
+
+    return true;
   };
 
   const adminLogout = () => {
@@ -298,6 +269,3 @@ export function useAuth() {
   }
   return context;
 }
-
-export { ROLE_PERMISSIONS, MOCK_ADMIN_USERS };
-export type { AdminUser };
