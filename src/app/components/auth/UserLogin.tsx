@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, Link } from 'react-router';
 import {
   Box,
   Container,
@@ -10,10 +10,9 @@ import {
   InputAdornment,
   IconButton,
   Alert,
-  Link,
   Divider,
 } from '@mui/material';
-import { Visibility, VisibilityOff, Person } from '@mui/icons-material';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { useAuth } from '@/app/contexts/AuthContext';
 import exampleLogo from '@/assets/2ac5b205356b38916f5ff32008dfa103d8ffc2cb.png';
 
@@ -217,15 +216,6 @@ export function UserLogin() {
             >
               Create Account
             </Button>
-          </Box>
-
-          <Box sx={{ textAlign: 'center', mt: 4, pt: 3, borderTop: '1px solid rgba(212, 175, 55, 0.2)' }}>
-            <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 1 }}>
-              <strong>Demo Account:</strong>
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#a0a0a0' }}>
-              Email: demo@prodculator.com | Password: demo123
-            </Typography>
           </Box>
 
           <Box sx={{ textAlign: 'center', mt: 3 }}>
