@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Box,
@@ -24,9 +24,11 @@ export function AdminLogin() {
   const [loading, setLoading] = useState(false);
 
   // Redirect if already authenticated
-  if (isAdminAuthenticated) {
-    navigate('/admin/overview');
-  }
+  useEffect(() => {
+    if (isAdminAuthenticated) {
+      navigate('/admin/overview');
+    }
+  }, [isAdminAuthenticated, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

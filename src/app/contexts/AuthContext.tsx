@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authService } from '@/services/auth.service';
+import { isAdminSession } from '@/services/api';
 
 // Admin permission levels
 export type AdminRole = 'master_admin' | 'senior_admin' | 'data_admin' | 'support_admin';
@@ -119,6 +120,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Check for existing session on mount
   useEffect(() => {
     const checkSession = async () => {
+      // Skip the regular-user check when an admin token is in storage —
+      // /api/auth/me rejects admin tokens with 401.
+      if (isAdminSession()) return;
       const currentUser = await authService.getCurrentUser();
       if (currentUser && currentUser.user_type !== 'admin') {
         setUser({

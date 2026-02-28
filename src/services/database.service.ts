@@ -4,6 +4,7 @@
  */
 
 import { apiClient } from './api';
+import type { Festival } from '@/app/types/festival';
 
 export interface Report {
   id: string;
@@ -39,14 +40,6 @@ export interface GrantOpportunity {
   website_url?: string;
 }
 
-export interface FilmFestival {
-  id: string;
-  name: string;
-  location: string;
-  submission_deadline?: string;
-  website_url?: string;
-  filmfreeway_url?: string;
-}
 
 export class DatabaseService {
   async createReport(
@@ -150,20 +143,21 @@ export class DatabaseService {
     return { error: 'Grant deletion moved to admin API endpoints.' };
   }
 
-  async getAllFestivals(): Promise<{ festivals: FilmFestival[]; error: string | null }> {
+  async getAllFestivals(): Promise<{ festivals: Festival[]; error: string | null }> {
     try {
-      const festivals = await apiClient.get<FilmFestival[]>('/api/festivals');
+      const data = await apiClient.get<{ items: Festival[] } | Festival[]>('/api/festivals');
+      const festivals = Array.isArray(data) ? data : data.items;
       return { festivals, error: null };
     } catch (error) {
       return { festivals: [], error: error instanceof Error ? error.message : 'Failed to fetch festivals' };
     }
   }
 
-  async createFestival(_festival: Omit<FilmFestival, 'id'>): Promise<{ error: string | null }> {
+  async createFestival(_festival: Omit<Festival, 'id'>): Promise<{ error: string | null }> {
     return { error: 'Festival creation moved to admin API endpoints.' };
   }
 
-  async updateFestival(_festivalId: string, _updates: Partial<FilmFestival>): Promise<{ error: string | null }> {
+  async updateFestival(_festivalId: string, _updates: Partial<Festival>): Promise<{ error: string | null }> {
     return { error: 'Festival updates moved to admin API endpoints.' };
   }
 

@@ -9,6 +9,7 @@ import {
   getAccessToken,
   getRefreshToken,
   setTokens,
+  setTokensSilent,
   subscribeAuthState,
 } from './api';
 
@@ -137,7 +138,10 @@ export class AuthService {
   async adminSignIn(email: string, password: string): Promise<{ user: AuthUser | null; error: string | null }> {
     try {
       const data = await apiClient.post<TokenResponse>('/api/admin/auth/signin', { email, password });
-      setTokens(data.access_token, data.refresh_token);
+      // Use silent setter: stores tokens without emitting a regular auth-state
+      // change, so the onAuthStateChange listener won't call /api/auth/me with
+      // an admin token and produce spurious 401s.
+      setTokensSilent(data.access_token, data.refresh_token);
       return { user: data.user, error: null };
     } catch (error) {
       return { user: null, error: error instanceof Error ? error.message : 'Admin sign in failed' };
