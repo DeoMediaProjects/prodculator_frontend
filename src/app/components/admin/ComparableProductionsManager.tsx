@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -18,100 +18,83 @@ import {
   DialogActions,
   TextField,
   MenuItem,
+  Alert,
+  CircularProgress,
 } from '@mui/material';
 import { Edit, Add, Refresh } from '@mui/icons-material';
-
-interface ComparableProduction {
-  id: string;
-  title: string;
-  year: number;
-  genre: string;
-  budget: number;
-  territory: string;
-  incentiveUsed: string;
-  tmdbId?: string;
-  source: string;
-  lastUpdated: string;
-}
-
-const mockProductions: ComparableProduction[] = [
-  {
-    id: '1',
-    title: 'The Crown (Season 6)',
-    year: 2023,
-    genre: 'Drama',
-    budget: 13000000,
-    territory: 'United Kingdom',
-    incentiveUsed: 'UK Film Tax Relief',
-    tmdbId: '1399',
-    source: 'TMDB API + BFI Records',
-    lastUpdated: '2026-01-15',
-  },
-  {
-    id: '2',
-    title: 'Deadpool 3',
-    year: 2024,
-    genre: 'Action/Comedy',
-    budget: 200000000,
-    territory: 'British Columbia',
-    incentiveUsed: 'BC Film Incentive',
-    tmdbId: '533535',
-    source: 'TMDB API',
-    lastUpdated: '2026-01-12',
-  },
-  {
-    id: '3',
-    title: 'Stranger Things (Season 4)',
-    year: 2022,
-    genre: 'Sci-Fi',
-    budget: 30000000,
-    territory: 'Georgia (USA)',
-    incentiveUsed: 'Georgia Film Tax Credit',
-    tmdbId: '66732',
-    source: 'TMDB API + Public Records',
-    lastUpdated: '2026-01-10',
-  },
-  {
-    id: '4',
-    title: 'Jurassic World Dominion',
-    year: 2022,
-    genre: 'Adventure',
-    budget: 165000000,
-    territory: 'Malta',
-    incentiveUsed: 'Malta Cash Rebate',
-    tmdbId: '507086',
-    source: 'Malta Film Commission',
-    lastUpdated: '2025-12-28',
-  },
-];
+import { adminApi } from '@/services/admin.api';
+import type { ComparableProduction } from '@/services/admin.types';
 
 const genres = ['Action', 'Drama', 'Comedy', 'Sci-Fi', 'Thriller', 'Horror', 'Adventure', 'Romance'];
 const territories = ['United Kingdom', 'British Columbia', 'Georgia (USA)', 'Malta', 'South Africa'];
 
 export function ComparableProductionsManager() {
-  const [productions, setProductions] = useState<ComparableProduction[]>(mockProductions);
+  const [productions, setProductions] = useState<ComparableProduction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduction, setEditingProduction] = useState<ComparableProduction | null>(null);
+  const [formData, setFormData] = useState<Partial<ComparableProduction>>({});
   const [syncing, setSyncing] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await adminApi.getComparables();
+      if (error) {
+        setFetchError(error);
+      } else {
+        setProductions(data?.items ?? []);
+      }
+      setLoading(false);
+    })();
+  }, []);
 
   const handleEdit = (production: ComparableProduction) => {
     setEditingProduction(production);
+    setFormData(production);
     setDialogOpen(true);
   };
 
   const handleAdd = () => {
     setEditingProduction(null);
+    setFormData({});
     setDialogOpen(true);
   };
 
   const handleClose = () => {
     setDialogOpen(false);
     setEditingProduction(null);
+    setFormData({});
+  };
+
+  const handleSave = async () => {
+    if (editingProduction) {
+      const payload: ComparableProduction = {
+        ...editingProduction,
+        ...formData,
+        lastUpdated: new Date().toISOString().split('T')[0],
+      } as ComparableProduction;
+      const { data, error } = await adminApi.updateComparable(editingProduction.id, payload);
+      if (!error && data) {
+        setProductions(productions.map(p => p.id === editingProduction.id ? data : p));
+      }
+    } else {
+      const payload: ComparableProduction = {
+        ...formData,
+        id: '',
+        lastUpdated: new Date().toISOString().split('T')[0],
+      } as ComparableProduction;
+      const { data, error } = await adminApi.createComparable(payload);
+      if (!error && data) {
+        setProductions([...productions, data]);
+      }
+    }
+    handleClose();
   };
 
   const handleSyncTMDB = async () => {
     setSyncing(true);
-    // Simulate API sync
+    // Simulate API sync — no TMDB endpoint available yet
     setTimeout(() => {
       setSyncing(false);
     }, 2000);
@@ -162,6 +145,15 @@ export function ComparableProductionsManager() {
           </Button>
         </Box>
       </Box>
+
+      {fetchError && (
+        <Alert severity="error" sx={{ mb: 3 }}>{fetchError}</Alert>
+      )}
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress sx={{ color: '#D4AF37' }} />
+        </Box>
+      )}
 
       <Paper sx={{ bgcolor: '#0a0a0a', border: '1px solid rgba(212, 175, 55, 0.2)' }}>
         <TableContainer>
@@ -249,19 +241,22 @@ export function ComparableProductionsManager() {
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mt: 2 }}>
             <TextField
               label="Title"
-              defaultValue={editingProduction?.title || ''}
+              value={formData.title || ''}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               fullWidth
             />
             <TextField
               label="Year"
               type="number"
-              defaultValue={editingProduction?.year || ''}
+              value={formData.year ?? ''}
+              onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
               fullWidth
             />
             <TextField
               select
               label="Genre"
-              defaultValue={editingProduction?.genre || ''}
+              value={formData.genre || ''}
+              onChange={(e) => setFormData({ ...formData, genre: e.target.value })}
               fullWidth
             >
               {genres.map((genre) => (
@@ -273,13 +268,15 @@ export function ComparableProductionsManager() {
             <TextField
               label="Budget ($)"
               type="number"
-              defaultValue={editingProduction?.budget || ''}
+              value={formData.budget ?? ''}
+              onChange={(e) => setFormData({ ...formData, budget: parseFloat(e.target.value) })}
               fullWidth
             />
             <TextField
               select
               label="Territory"
-              defaultValue={editingProduction?.territory || ''}
+              value={formData.territory || ''}
+              onChange={(e) => setFormData({ ...formData, territory: e.target.value })}
               fullWidth
             >
               {territories.map((territory) => (
@@ -290,17 +287,20 @@ export function ComparableProductionsManager() {
             </TextField>
             <TextField
               label="Incentive Used"
-              defaultValue={editingProduction?.incentiveUsed || ''}
+              value={formData.incentiveUsed || ''}
+              onChange={(e) => setFormData({ ...formData, incentiveUsed: e.target.value })}
               fullWidth
             />
             <TextField
               label="TMDB ID (optional)"
-              defaultValue={editingProduction?.tmdbId || ''}
+              value={formData.tmdbId || ''}
+              onChange={(e) => setFormData({ ...formData, tmdbId: e.target.value })}
               fullWidth
             />
             <TextField
               label="Source"
-              defaultValue={editingProduction?.source || ''}
+              value={formData.source || ''}
+              onChange={(e) => setFormData({ ...formData, source: e.target.value })}
               fullWidth
             />
           </Box>
@@ -311,6 +311,7 @@ export function ComparableProductionsManager() {
           </Button>
           <Button
             variant="contained"
+            onClick={handleSave}
             sx={{
               bgcolor: '#D4AF37',
               color: '#000000',

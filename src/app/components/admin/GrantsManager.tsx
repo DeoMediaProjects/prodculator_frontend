@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -30,6 +30,7 @@ import {
   Tooltip,
   Switch,
   FormControlLabel,
+  CircularProgress,
 } from '@mui/material';
 import {
   Add,
@@ -45,27 +46,8 @@ import {
   Refresh,
   MonetizationOn,
 } from '@mui/icons-material';
-
-interface Grant {
-  id: string;
-  title: string;
-  territory: string;
-  fundingBody: string;
-  maxAmount: string;
-  currency: string;
-  applicationOpens: string;
-  applicationDeadline: string;
-  status: 'opening-soon' | 'open' | 'closing-soon' | 'closed';
-  daysUntilDeadline: number;
-  eligibility: string[];
-  websiteUrl: string;
-  dataSource: 'manual' | 'rss' | 'api' | 'scrape';
-  verified: boolean;
-  isNew: boolean;
-  createdAt: string;
-  updatedAt: string;
-  lastVerifiedAt?: string;
-}
+import { adminApi } from '@/services/admin.api';
+import type { Grant } from '@/services/admin.types';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -83,67 +65,21 @@ function TabPanel({ children, value, index }: TabPanelProps) {
 
 export function GrantsManager() {
   const [currentTab, setCurrentTab] = useState(0);
-  const [grants, setGrants] = useState<Grant[]>([
-    {
-      id: '1',
-      title: 'BFI Production Fund - High-End TV',
-      territory: 'UK',
-      fundingBody: 'British Film Institute',
-      maxAmount: '1200000',
-      currency: 'GBP',
-      applicationOpens: '2026-02-01',
-      applicationDeadline: '2026-02-28',
-      status: 'opening-soon',
-      daysUntilDeadline: 36,
-      eligibility: ['UK-qualified productions', 'High-end TV drama', 'Budget >£1M/hour'],
-      websiteUrl: 'https://www.bfi.org.uk/funding',
-      dataSource: 'manual',
-      verified: true,
-      isNew: true,
-      createdAt: '2026-01-20T10:00:00Z',
-      updatedAt: '2026-01-23T08:00:00Z',
-      lastVerifiedAt: '2026-01-23T08:00:00Z',
-    },
-    {
-      id: '2',
-      title: 'Canada Media Fund - Convergent Stream',
-      territory: 'Canada',
-      fundingBody: 'Canada Media Fund',
-      maxAmount: '2500000',
-      currency: 'CAD',
-      applicationOpens: '2026-01-10',
-      applicationDeadline: '2026-02-15',
-      status: 'open',
-      daysUntilDeadline: 23,
-      eligibility: ['Canadian content', 'Digital media component', 'Broadcaster agreement'],
-      websiteUrl: 'https://www.cmf-fmc.ca',
-      dataSource: 'rss',
-      verified: false,
-      isNew: false,
-      createdAt: '2026-01-15T14:00:00Z',
-      updatedAt: '2026-01-15T14:00:00Z',
-    },
-    {
-      id: '3',
-      title: 'Sundance Institute Documentary Fund',
-      territory: 'USA',
-      fundingBody: 'Sundance Institute',
-      maxAmount: '50000',
-      currency: 'USD',
-      applicationOpens: '2025-12-01',
-      applicationDeadline: '2026-01-31',
-      status: 'closing-soon',
-      daysUntilDeadline: 8,
-      eligibility: ['Documentary features', 'Creative treatment of actuality', 'Non-fiction storytelling'],
-      websiteUrl: 'https://www.sundance.org/programs/documentary-fund',
-      dataSource: 'manual',
-      verified: true,
-      isNew: false,
-      createdAt: '2025-12-01T10:00:00Z',
-      updatedAt: '2026-01-20T08:00:00Z',
-      lastVerifiedAt: '2026-01-20T08:00:00Z',
-    },
-  ]);
+  const [grants, setGrants] = useState<Grant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await adminApi.getGrants();
+      if (error) {
+        setFetchError(error);
+      } else {
+        setGrants(data?.items ?? []);
+      }
+      setLoading(false);
+    })();
+  }, []);
 
   const [addGrantOpen, setAddGrantOpen] = useState(false);
   const [editGrantOpen, setEditGrantOpen] = useState(false);
@@ -189,9 +125,9 @@ export function GrantsManager() {
     }
   };
 
-  const handleAddGrant = () => {
-    const newGrant: Grant = {
-      id: Date.now().toString(),
+  const handleAddGrant = async () => {
+    const payload: Grant = {
+      id: '',
       title: formData.title,
       territory: formData.territory,
       fundingBody: formData.fundingBody,
@@ -210,47 +146,48 @@ export function GrantsManager() {
       updatedAt: new Date().toISOString(),
       lastVerifiedAt: formData.verified ? new Date().toISOString() : undefined,
     };
-
-    setGrants([...grants, newGrant]);
+    const { data, error } = await adminApi.createGrant(payload);
+    if (!error && data) {
+      setGrants([...grants, data]);
+    }
     setAddGrantOpen(false);
     resetForm();
   };
 
-  const handleEditGrant = () => {
+  const handleEditGrant = async () => {
     if (!selectedGrant) return;
-
-    const updatedGrants = grants.map(grant => {
-      if (grant.id === selectedGrant.id) {
-        return {
-          ...grant,
-          title: formData.title,
-          territory: formData.territory,
-          fundingBody: formData.fundingBody,
-          maxAmount: formData.maxAmount,
-          currency: formData.currency,
-          applicationOpens: formData.applicationOpens,
-          applicationDeadline: formData.applicationDeadline,
-          status: calculateStatus(formData.applicationOpens, formData.applicationDeadline),
-          daysUntilDeadline: calculateDaysUntilDeadline(formData.applicationDeadline),
-          eligibility: formData.eligibility.split('\n').filter(e => e.trim()),
-          websiteUrl: formData.websiteUrl,
-          verified: formData.verified,
-          updatedAt: new Date().toISOString(),
-          lastVerifiedAt: formData.verified ? new Date().toISOString() : grant.lastVerifiedAt,
-        };
-      }
-      return grant;
-    });
-
-    setGrants(updatedGrants);
+    const payload: Grant = {
+      ...selectedGrant,
+      title: formData.title,
+      territory: formData.territory,
+      fundingBody: formData.fundingBody,
+      maxAmount: formData.maxAmount,
+      currency: formData.currency,
+      applicationOpens: formData.applicationOpens,
+      applicationDeadline: formData.applicationDeadline,
+      status: calculateStatus(formData.applicationOpens, formData.applicationDeadline),
+      daysUntilDeadline: calculateDaysUntilDeadline(formData.applicationDeadline),
+      eligibility: formData.eligibility.split('\n').filter(e => e.trim()),
+      websiteUrl: formData.websiteUrl,
+      verified: formData.verified,
+      updatedAt: new Date().toISOString(),
+      lastVerifiedAt: formData.verified ? new Date().toISOString() : selectedGrant.lastVerifiedAt,
+    };
+    const { data, error } = await adminApi.updateGrant(selectedGrant.id, payload);
+    if (!error && data) {
+      setGrants(grants.map(g => g.id === selectedGrant.id ? data : g));
+    }
     setEditGrantOpen(false);
     setSelectedGrant(null);
     resetForm();
   };
 
-  const handleDeleteGrant = () => {
+  const handleDeleteGrant = async () => {
     if (!selectedGrant) return;
-    setGrants(grants.filter(g => g.id !== selectedGrant.id));
+    const { error } = await adminApi.deleteGrant(selectedGrant.id);
+    if (!error) {
+      setGrants(grants.filter(g => g.id !== selectedGrant.id));
+    }
     setDeleteConfirmOpen(false);
     setSelectedGrant(null);
   };
@@ -282,17 +219,18 @@ export function GrantsManager() {
     setDeleteConfirmOpen(true);
   };
 
-  const toggleVerified = (grantId: string) => {
-    setGrants(grants.map(grant => {
-      if (grant.id === grantId) {
-        return {
-          ...grant,
-          verified: !grant.verified,
-          lastVerifiedAt: !grant.verified ? new Date().toISOString() : grant.lastVerifiedAt,
-        };
-      }
-      return grant;
-    }));
+  const toggleVerified = async (grantId: string) => {
+    const target = grants.find(g => g.id === grantId);
+    if (!target) return;
+    const payload: Grant = {
+      ...target,
+      verified: !target.verified,
+      lastVerifiedAt: !target.verified ? new Date().toISOString() : target.lastVerifiedAt,
+    };
+    const { data, error } = await adminApi.updateGrant(grantId, payload);
+    if (!error && data) {
+      setGrants(grants.map(g => g.id === grantId ? data : g));
+    }
   };
 
   const resetForm = () => {
@@ -389,6 +327,15 @@ export function GrantsManager() {
           </Button>
         </Box>
       </Box>
+
+      {fetchError && (
+        <Alert severity="error" sx={{ mb: 3 }}>{fetchError}</Alert>
+      )}
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress sx={{ color: '#D4AF37' }} />
+        </Box>
+      )}
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>

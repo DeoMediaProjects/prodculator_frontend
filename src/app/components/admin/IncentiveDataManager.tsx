@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -24,6 +24,7 @@ import {
   IconButton,
   Collapse,
   Link,
+  CircularProgress,
 } from '@mui/material';
 import {
   Edit,
@@ -37,27 +38,8 @@ import {
   OpenInNew,
   Refresh,
 } from '@mui/icons-material';
-
-interface PendingChange {
-  territory: string;
-  field: string;
-  currentValue: string;
-  detectedValue: string;
-  confidence: 'high' | 'medium' | 'low';
-  source: string;
-}
-
-interface IncentiveData {
-  territory: string;
-  program: string;
-  rate: string;
-  cap: string;
-  lastUpdated: string;
-  status: 'Active' | 'Assessment Only';
-  sourceUrl: string;
-  autoSyncEnabled: boolean;
-  lastAutoCheck?: string;
-}
+import { adminApi } from '@/services/admin.api';
+import type { IncentiveData, PendingChange } from '@/services/admin.types';
 
 export function IncentiveDataManager(_props?: any) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -65,303 +47,23 @@ export function IncentiveDataManager(_props?: any) {
   const [syncing, setSyncing] = useState(false);
   const [showPendingChanges, setShowPendingChanges] = useState(false);
 
-  const [incentives, setIncentives] = useState<IncentiveData[]>([
-    // ===== UNITED KINGDOM =====
-    {
-      territory: 'United Kingdom (National)',
-      program: 'UK Film Tax Relief',
-      rate: '25.5%',
-      cap: 'Uncapped',
-      lastUpdated: '2026-01-15',
-      status: 'Active',
-      sourceUrl: 'https://www.bfi.org.uk/film-industry/uk-film-tax-relief',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-23',
-    },
-    {
-      territory: 'England',
-      program: 'England Production Fund',
-      rate: 'Up to £500K',
-      cap: '£500K per project',
-      lastUpdated: '2026-01-15',
-      status: 'Active',
-      sourceUrl: 'https://www.creativengland.co.uk/',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-23',
-    },
-    {
-      territory: 'Yorkshire (UK)',
-      program: 'Yorkshire Content Fund',
-      rate: 'Up to £1M',
-      cap: '£1M per project',
-      lastUpdated: '2026-01-12',
-      status: 'Active',
-      sourceUrl: 'https://www.screenyorkshire.co.uk/yorkshire-content-fund/',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-23',
-    },
-    {
-      territory: 'Liverpool (UK)',
-      program: 'Liverpool City Region Production Fund',
-      rate: 'Up to £500K',
-      cap: '£500K per project',
-      lastUpdated: '2026-01-10',
-      status: 'Active',
-      sourceUrl: 'https://www.liverpoolcityregion-ca.gov.uk/',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-20',
-    },
-    {
-      territory: 'Scotland',
-      program: 'Screen Scotland Production Growth Fund',
-      rate: 'Up to £2M',
-      cap: '£2M per project',
-      lastUpdated: '2026-01-14',
-      status: 'Active',
-      sourceUrl: 'https://www.screen.scot/funding-and-support',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-23',
-    },
-    {
-      territory: 'Wales',
-      program: 'Creative Wales Production Funding',
-      rate: 'Up to £2M',
-      cap: '£2M per project',
-      lastUpdated: '2026-01-11',
-      status: 'Active',
-      sourceUrl: 'https://www.creativewales.gov.wales/',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-22',
-    },
-    {
-      territory: 'Northern Ireland',
-      program: 'Northern Ireland Screen Production Fund',
-      rate: 'Up to £1M',
-      cap: '£1M per project',
-      lastUpdated: '2026-01-13',
-      status: 'Active',
-      sourceUrl: 'https://northernirelandscreen.co.uk/funding/',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-21',
-    },
-    
-    // ===== CANADA =====
-    {
-      territory: 'British Columbia',
-      program: 'BC Film Incentive',
-      rate: '35%',
-      cap: '$10M',
-      lastUpdated: '2026-01-10',
-      status: 'Active',
-      sourceUrl: 'https://www.creativebc.com/programs/motion-picture-tax-credit',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-23',
-    },
-    {
-      territory: 'Ontario',
-      program: 'Ontario Film & TV Tax Credit',
-      rate: '35%',
-      cap: 'Uncapped',
-      lastUpdated: '2026-01-12',
-      status: 'Active',
-      sourceUrl: 'https://www.ontariocreates.ca/film-tax-credits',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-23',
-    },
-    {
-      territory: 'Quebec',
-      program: 'SODEC Tax Credit',
-      rate: '35%',
-      cap: 'Uncapped',
-      lastUpdated: '2026-01-11',
-      status: 'Active',
-      sourceUrl: 'https://sodec.gouv.qc.ca/',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-22',
-    },
-    {
-      territory: 'Alberta',
-      program: 'Alberta Film Grant',
-      rate: 'Up to 22%',
-      cap: '$10M',
-      lastUpdated: '2026-01-09',
-      status: 'Active',
-      sourceUrl: 'https://albertafilm.ca/production-services/alberta-film-grant/',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-20',
-    },
-    {
-      territory: 'Manitoba',
-      program: 'Manitoba Film & Music Tax Credit',
-      rate: '30-45%',
-      cap: 'Uncapped',
-      lastUpdated: '2026-01-08',
-      status: 'Active',
-      sourceUrl: 'https://www.mbfilmmusic.ca/incentives/',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-19',
-    },
-    {
-      territory: 'Nova Scotia',
-      program: 'Nova Scotia Film & TV Tax Credit',
-      rate: '32%',
-      cap: 'Uncapped',
-      lastUpdated: '2026-01-10',
-      status: 'Active',
-      sourceUrl: 'https://screennovascotia.com/film-tv-tax-credit/',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-21',
-    },
-    
-    // ===== UNITED STATES =====
-    {
-      territory: 'Georgia (USA)',
-      program: 'Film Tax Credit',
-      rate: '30%',
-      cap: 'Uncapped',
-      lastUpdated: '2026-01-08',
-      status: 'Active',
-      sourceUrl: 'https://www.georgia.org/industries/film-entertainment/georgia-film-tv-production/incentives',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-20',
-    },
-    {
-      territory: 'California (USA)',
-      program: 'California Film & TV Tax Credit',
-      rate: '20-25%',
-      cap: '$330M annual allocation',
-      lastUpdated: '2026-01-14',
-      status: 'Active',
-      sourceUrl: 'https://film.ca.gov/tax-credit/',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-23',
-    },
-    {
-      territory: 'New York (USA)',
-      program: 'NY Film Production Tax Credit',
-      rate: '30%',
-      cap: '$700M annual allocation',
-      lastUpdated: '2026-01-13',
-      status: 'Active',
-      sourceUrl: 'https://esd.ny.gov/film-production-tax-credit-program',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-22',
-    },
-    {
-      territory: 'Louisiana (USA)',
-      program: 'Louisiana Entertainment Tax Credit',
-      rate: '40%',
-      cap: '$150M annual cap',
-      lastUpdated: '2026-01-11',
-      status: 'Active',
-      sourceUrl: 'https://www.louisianaentertainment.gov/film-tv-incentive',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-21',
-    },
-    {
-      territory: 'New Mexico (USA)',
-      program: 'NM Film Production Tax Credit',
-      rate: '25-35%',
-      cap: '$110M annual cap',
-      lastUpdated: '2026-01-10',
-      status: 'Active',
-      sourceUrl: 'https://nmfilm.com/film-production-tax-incentive/',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-20',
-    },
-    {
-      territory: 'North Carolina (USA)',
-      program: 'NC Film & Entertainment Grant',
-      rate: '25%',
-      cap: '$31M annual allocation',
-      lastUpdated: '2026-01-09',
-      status: 'Active',
-      sourceUrl: 'https://www.filmnc.com/nc-film-grant',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-19',
-    },
-    {
-      territory: 'Illinois (USA)',
-      program: 'Illinois Film Tax Credit',
-      rate: '30%',
-      cap: 'Uncapped',
-      lastUpdated: '2026-01-12',
-      status: 'Active',
-      sourceUrl: 'https://www2.illinois.gov/dceo/AboutDCEO/OfficesandInitiatives/Pages/FilmOffice.aspx',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-22',
-    },
-    {
-      territory: 'Massachusetts (USA)',
-      program: 'MA Film Tax Incentive',
-      rate: '25%',
-      cap: 'Uncapped',
-      lastUpdated: '2026-01-11',
-      status: 'Active',
-      sourceUrl: 'https://www.mass.gov/film-tax-incentive',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-21',
-    },
-    
-    // ===== MALTA =====
-    {
-      territory: 'Malta',
-      program: 'Cash Rebate',
-      rate: '40%',
-      cap: 'Uncapped',
-      lastUpdated: '2025-12-20',
-      status: 'Active',
-      sourceUrl: 'https://www.maltafilmcommission.com/incentives',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-15',
-    },
-    
-    // ===== SOUTH AFRICA =====
-    {
-      territory: 'South Africa (National)',
-      program: 'Foreign Film & TV Production Incentive',
-      rate: '20-35%',
-      cap: 'R50M per project',
-      lastUpdated: '2026-01-01',
-      status: 'Active',
-      sourceUrl: 'https://www.nfvf.co.za/',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-23',
-    },
-    {
-      territory: 'Western Cape (SA)',
-      program: 'Western Cape Film Commission Support',
-      rate: '20-35%',
-      cap: 'R50M per project',
-      lastUpdated: '2026-01-01',
-      status: 'Active',
-      sourceUrl: 'https://www.capefilmcommission.co.za/',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-23',
-    },
-    {
-      territory: 'KwaZulu-Natal (SA)',
-      program: 'KZN Film Commission Support',
-      rate: '20-35%',
-      cap: 'R50M per project',
-      lastUpdated: '2026-01-01',
-      status: 'Active',
-      sourceUrl: 'https://www.kznfc.co.za/',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-23',
-    },
-    {
-      territory: 'Gauteng (SA)',
-      program: 'Gauteng Film Commission Support',
-      rate: '20-35%',
-      cap: 'R50M per project',
-      lastUpdated: '2026-01-01',
-      status: 'Active',
-      sourceUrl: 'https://www.gautengfilm.org.za/',
-      autoSyncEnabled: true,
-      lastAutoCheck: '2026-01-23',
-    },
-  ]);
+  const [incentives, setIncentives] = useState<IncentiveData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [editingIncentive, setEditingIncentive] = useState<IncentiveData | null>(null);
+  const [editFormData, setEditFormData] = useState<Partial<IncentiveData>>({});
+
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await adminApi.getIncentives();
+      if (error) {
+        setFetchError(error);
+      } else {
+        setIncentives(data?.items ?? []);
+      }
+      setLoading(false);
+    })();
+  }, []);
 
   // Mock pending changes detected by AI
   const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([
@@ -392,6 +94,26 @@ export function IncentiveDataManager(_props?: any) {
 
   const handleRejectChange = (change: PendingChange) => {
     setPendingChanges(pendingChanges.filter(c => c !== change));
+  };
+
+  const handleSaveIncentive = async () => {
+    if (editingIncentive?.id) {
+      const { data, error } = await adminApi.updateIncentive(
+        editingIncentive.id,
+        { ...editingIncentive, ...editFormData } as IncentiveData,
+      );
+      if (!error && data) {
+        setIncentives(incentives.map(i => i.id === editingIncentive.id ? data : i));
+      }
+    } else {
+      const { data, error } = await adminApi.createIncentive(editFormData as IncentiveData);
+      if (!error && data) {
+        setIncentives([...incentives, data]);
+      }
+    }
+    setEditDialogOpen(false);
+    setEditingIncentive(null);
+    setEditFormData({});
   };
 
   return (
@@ -439,6 +161,15 @@ export function IncentiveDataManager(_props?: any) {
           </Button>
         </Box>
       </Box>
+
+      {fetchError && (
+        <Alert severity="error" sx={{ mb: 3 }}>{fetchError}</Alert>
+      )}
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress sx={{ color: '#D4AF37' }} />
+        </Box>
+      )}
 
       {/* Auto-Sync Status Card */}
       <Card sx={{ mb: 3, bgcolor: '#0a0a0a', border: '1px solid rgba(212, 175, 55, 0.2)' }}>
@@ -802,7 +533,14 @@ export function IncentiveDataManager(_props?: any) {
                       />
                     </TableCell>
                     <TableCell>
-                      <IconButton size="small" onClick={() => setEditDialogOpen(true)}>
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          setEditingIncentive(incentive);
+                          setEditFormData(incentive);
+                          setEditDialogOpen(true);
+                        }}
+                      >
                         <Edit sx={{ color: '#D4AF37', fontSize: 18 }} />
                       </IconButton>
                     </TableCell>
@@ -910,7 +648,11 @@ export function IncentiveDataManager(_props?: any) {
       {/* Edit Dialog */}
       <Dialog
         open={editDialogOpen}
-        onClose={() => setEditDialogOpen(false)}
+        onClose={() => {
+          setEditDialogOpen(false);
+          setEditingIncentive(null);
+          setEditFormData({});
+        }}
         maxWidth="sm"
         fullWidth
         PaperProps={{
@@ -920,24 +662,57 @@ export function IncentiveDataManager(_props?: any) {
           },
         }}
       >
-        <DialogTitle sx={{ color: '#D4AF37', fontWeight: 600 }}>Edit Incentive Data</DialogTitle>
+        <DialogTitle sx={{ color: '#D4AF37', fontWeight: 600 }}>
+          {editingIncentive ? 'Edit Incentive Data' : 'Add Territory'}
+        </DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
-            <TextField label="Territory" fullWidth />
-            <TextField label="Program Name" fullWidth />
-            <TextField label="Rate (%)" fullWidth />
-            <TextField label="Cap" fullWidth />
-            <TextField label="Source URL" fullWidth />
-            <TextField label="Notes" fullWidth multiline rows={3} />
+            <TextField
+              label="Territory"
+              fullWidth
+              value={editFormData.territory || ''}
+              onChange={(e) => setEditFormData({ ...editFormData, territory: e.target.value })}
+            />
+            <TextField
+              label="Program Name"
+              fullWidth
+              value={editFormData.program || ''}
+              onChange={(e) => setEditFormData({ ...editFormData, program: e.target.value })}
+            />
+            <TextField
+              label="Rate"
+              fullWidth
+              value={editFormData.rate || ''}
+              onChange={(e) => setEditFormData({ ...editFormData, rate: e.target.value })}
+            />
+            <TextField
+              label="Cap"
+              fullWidth
+              value={editFormData.cap || ''}
+              onChange={(e) => setEditFormData({ ...editFormData, cap: e.target.value })}
+            />
+            <TextField
+              label="Source URL"
+              fullWidth
+              value={editFormData.sourceUrl || ''}
+              onChange={(e) => setEditFormData({ ...editFormData, sourceUrl: e.target.value })}
+            />
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 3, pt: 0 }}>
-          <Button onClick={() => setEditDialogOpen(false)} sx={{ color: '#a0a0a0' }}>
+          <Button
+            onClick={() => {
+              setEditDialogOpen(false);
+              setEditingIncentive(null);
+              setEditFormData({});
+            }}
+            sx={{ color: '#a0a0a0' }}
+          >
             Cancel
           </Button>
           <Button
             variant="contained"
-            onClick={() => setEditDialogOpen(false)}
+            onClick={handleSaveIncentive}
             sx={{
               bgcolor: '#D4AF37',
               color: '#000000',

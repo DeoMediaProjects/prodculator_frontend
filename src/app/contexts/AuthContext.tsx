@@ -57,7 +57,7 @@ interface AuthContextType {
   adminUser: AdminUser | null;
   isAdminAuthenticated: boolean;
   adminLogin: (email: string, password: string) => Promise<boolean>;
-  adminLogout: () => void;
+  adminLogout: () => Promise<void>;
   hasAdminPermission: (permission: keyof AdminPermissions) => boolean;
 }
 
@@ -120,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const checkSession = async () => {
       const currentUser = await authService.getCurrentUser();
-      if (currentUser) {
+      if (currentUser && currentUser.user_type !== 'admin') {
         setUser({
           email: currentUser.email,
           plan: currentUser.plan || 'free',
@@ -129,7 +129,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       }
     };
+
+    const checkAdminSession = async () => {
+      const adminProfile = await authService.getAdminUser();
+      if (adminProfile) {
+        const role = (adminProfile.role as AdminRole) || 'support_admin';
+        setAdminUser({
+          id: adminProfile.id,
+          email: adminProfile.email,
+          name: adminProfile.name || adminProfile.email,
+          role,
+          permissions: ROLE_PERMISSIONS[role],
+          createdAt: '',
+        });
+      }
+    };
+
     checkSession();
+    checkAdminSession();
 
     // Subscribe to auth state changes
     const { data: authListener } = authService.onAuthStateChange((user) => {
@@ -230,7 +247,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
-  const adminLogout = () => {
+  const adminLogout = async () => {
+    await authService.adminSignOut();
     setAdminUser(null);
   };
 
