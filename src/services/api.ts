@@ -2,6 +2,7 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:800
 
 const ACCESS_TOKEN_KEY = 'prodculator_access_token';
 const REFRESH_TOKEN_KEY = 'prodculator_refresh_token';
+const ADMIN_SESSION_KEY = 'prodculator_admin_session';
 
 type AuthListener = (authenticated: boolean) => void;
 const authListeners = new Set<AuthListener>();
@@ -29,9 +30,23 @@ export function setTokens(accessToken: string, refreshToken: string) {
   emitAuthChange(true);
 }
 
+// Like setTokens but does NOT emit an auth-state change event.
+// Use for admin sign-in so the regular-user onAuthStateChange listener
+// does not fire and call /api/auth/me with an admin token.
+export function setTokensSilent(accessToken: string, refreshToken: string) {
+  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  localStorage.setItem(ADMIN_SESSION_KEY, 'true');
+}
+
+export function isAdminSession(): boolean {
+  return localStorage.getItem(ADMIN_SESSION_KEY) === 'true';
+}
+
 export function clearTokens() {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem(ADMIN_SESSION_KEY);
   emitAuthChange(false);
 }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -20,6 +20,7 @@ import {
   TextField,
   Grid,
   Tooltip,
+  CircularProgress,
 } from '@mui/material';
 import {
   Notifications,
@@ -39,7 +40,7 @@ import {
   EmojiEvents,
 } from '@mui/icons-material';
 import { Festival } from '@/app/types/festival';
-import { mockFestivals } from '@/app/data/festivals-mock';
+import { databaseService } from '@/services/database.service';
 
 interface IncentiveChange {
   id: string;
@@ -894,8 +895,24 @@ export function IncentiveAlerts({ userEmail, userPlan }: IncentiveAlertsProps) {
 
 // Festival Deadlines Section Component
 function FestivalDeadlinesSection({ userPlan }: { userPlan: 'free' | 'professional' | 'studio' }) {
+  const [allFestivals, setAllFestivals] = useState<Festival[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { festivals, error } = await databaseService.getAllFestivals();
+      if (error) {
+        setFetchError(error);
+      } else {
+        setAllFestivals(festivals);
+      }
+      setLoading(false);
+    })();
+  }, []);
+
   // Filter festivals - show only upcoming deadlines (not closed)
-  const upcomingFestivals = mockFestivals
+  const upcomingFestivals = allFestivals
     .filter(f => f.currentStatus !== 'closed' && f.nextDeadline)
     .sort((a, b) => (a.daysUntilNextDeadline || 999) - (b.daysUntilNextDeadline || 999))
     .slice(0, 10); // Show top 10 upcoming
@@ -958,20 +975,31 @@ function FestivalDeadlinesSection({ userPlan }: { userPlan: 'free' | 'profession
             Film Festival Deadlines
           </Typography>
         </Box>
-        <Chip
-          label={`${upcomingFestivals.filter(f => f.currentStatus === 'early-bird-open' || f.currentStatus === 'regular-open').length} Open Now`}
-          size="small"
-          sx={{
-            bgcolor: 'rgba(76, 175, 80, 0.2)',
-            color: '#4caf50',
-            fontWeight: 700,
-          }}
-        />
+        {!loading && !fetchError && (
+          <Chip
+            label={`${upcomingFestivals.filter(f => f.currentStatus === 'early-bird-open' || f.currentStatus === 'regular-open').length} Open Now`}
+            size="small"
+            sx={{
+              bgcolor: 'rgba(76, 175, 80, 0.2)',
+              color: '#4caf50',
+              fontWeight: 700,
+            }}
+          />
+        )}
       </Box>
 
       <Typography variant="body2" sx={{ color: '#a0a0a0', mb: 3 }}>
         Strategic festival submission deadlines matching your genres • Save up to $50 by submitting early bird
       </Typography>
+
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress sx={{ color: '#D4AF37' }} />
+        </Box>
+      )}
+      {fetchError && (
+        <Alert severity="error" sx={{ mb: 2 }}>{fetchError}</Alert>
+      )}
 
       <Grid container spacing={2}>
         {upcomingFestivals.map((festival) => (
