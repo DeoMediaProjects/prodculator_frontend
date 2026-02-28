@@ -179,19 +179,6 @@ export function AdminLogin() {
             </Button>
           </Box>
 
-          <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid rgba(212, 175, 55, 0.2)' }}>
-            <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 1 }}>
-              <strong>Demo Accounts:</strong>
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#a0a0a0', display: 'block', lineHeight: 1.8 }}>
-              • Master Admin: admin@prodculator.com<br />
-              • Senior Admin: senior@prodculator.com<br />
-              • Data Admin: data@prodculator.com<br />
-              • Support Admin: support@prodculator.com<br />
-              <em>(Any password works in demo mode)</em>
-            </Typography>
-          </Box>
-
           <Box sx={{ textAlign: 'center', mt: 3 }}>
             <Button
               onClick={() => navigate('/')}

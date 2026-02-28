@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -24,89 +24,76 @@ import {
   Alert,
   Switch,
   FormControlLabel,
+  CircularProgress,
 } from '@mui/material';
 import { Edit, Add, Sync, Warning, CheckCircle, Schedule, Info } from '@mui/icons-material';
-
-interface CrewRate {
-  id: string;
-  territory: string;
-  role: string;
-  category: string;
-  dayRate: number;
-  weekRate: number;
-  union: string;
-  lastUpdated: string;
-  source: string;
-}
-
-const mockCrewRates: CrewRate[] = [
-  {
-    id: '1',
-    territory: 'United Kingdom',
-    role: 'Director of Photography',
-    category: 'Camera',
-    dayRate: 650,
-    weekRate: 3250,
-    union: 'BECTU',
-    lastUpdated: '2026-01-15',
-    source: 'BECTU Rate Card 2026',
-  },
-  {
-    id: '2',
-    territory: 'British Columbia',
-    role: 'Gaffer',
-    category: 'Lighting',
-    dayRate: 550,
-    weekRate: 2750,
-    union: 'IATSE 891',
-    lastUpdated: '2026-01-10',
-    source: 'IATSE 891 Agreement',
-  },
-  {
-    id: '3',
-    territory: 'Georgia (USA)',
-    role: 'Production Designer',
-    category: 'Art Department',
-    dayRate: 700,
-    weekRate: 3500,
-    union: 'IATSE Local 479',
-    lastUpdated: '2026-01-08',
-    source: 'IATSE 479 Minimums',
-  },
-  {
-    id: '4',
-    territory: 'Malta',
-    role: 'Assistant Director',
-    category: 'Production',
-    dayRate: 400,
-    weekRate: 2000,
-    union: 'Non-Union',
-    lastUpdated: '2025-12-20',
-    source: 'Malta Film Commission Survey',
-  },
-];
+import { adminApi } from '@/services/admin.api';
+import type { CrewRate } from '@/services/admin.types';
 
 const territories = ['United Kingdom', 'British Columbia', 'Georgia (USA)', 'Malta', 'South Africa'];
 const categories = ['Camera', 'Lighting', 'Sound', 'Art Department', 'Production', 'Post-Production'];
 
 export function CrewCostsManager() {
-  const [crewRates, setCrewRates] = useState<CrewRate[]>(mockCrewRates);
+  const [crewRates, setCrewRates] = useState<CrewRate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRate, setEditingRate] = useState<CrewRate | null>(null);
+  const [formData, setFormData] = useState<Partial<CrewRate>>({});
+
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await adminApi.getCrewRates();
+      if (error) {
+        setFetchError(error);
+      } else {
+        setCrewRates(data?.items ?? []);
+      }
+      setLoading(false);
+    })();
+  }, []);
 
   const handleEdit = (rate: CrewRate) => {
     setEditingRate(rate);
+    setFormData(rate);
     setDialogOpen(true);
   };
 
   const handleAdd = () => {
     setEditingRate(null);
+    setFormData({});
     setDialogOpen(true);
   };
 
   const handleClose = () => {
     setDialogOpen(false);
     setEditingRate(null);
+    setFormData({});
+  };
+
+  const handleSave = async () => {
+    if (editingRate) {
+      const payload: CrewRate = {
+        ...editingRate,
+        ...formData,
+        lastUpdated: new Date().toISOString().split('T')[0],
+      } as CrewRate;
+      const { data, error } = await adminApi.updateCrewRate(editingRate.id, payload);
+      if (!error && data) {
+        setCrewRates(crewRates.map(r => r.id === editingRate.id ? data : r));
+      }
+    } else {
+      const payload: CrewRate = {
+        ...formData,
+        id: '',
+        lastUpdated: new Date().toISOString().split('T')[0],
+      } as CrewRate;
+      const { data, error } = await adminApi.createCrewRate(payload);
+      if (!error && data) {
+        setCrewRates([...crewRates, data]);
+      }
+    }
+    handleClose();
   };
 
   return (
@@ -153,6 +140,15 @@ export function CrewCostsManager() {
           </Button>
         </Box>
       </Box>
+
+      {fetchError && (
+        <Alert severity="error" sx={{ mb: 3 }}>{fetchError}</Alert>
+      )}
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress sx={{ color: '#D4AF37' }} />
+        </Box>
+      )}
 
       {/* Legal Disclaimer */}
       <Alert
@@ -359,7 +355,8 @@ export function CrewCostsManager() {
             <TextField
               select
               label="Territory"
-              defaultValue={editingRate?.territory || ''}
+              value={formData.territory || ''}
+              onChange={(e) => setFormData({ ...formData, territory: e.target.value })}
               fullWidth
             >
               {territories.map((territory) => (
@@ -370,13 +367,15 @@ export function CrewCostsManager() {
             </TextField>
             <TextField
               label="Role"
-              defaultValue={editingRate?.role || ''}
+              value={formData.role || ''}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
               fullWidth
             />
             <TextField
               select
               label="Category"
-              defaultValue={editingRate?.category || ''}
+              value={formData.category || ''}
+              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
               fullWidth
             >
               {categories.map((category) => (
@@ -387,24 +386,28 @@ export function CrewCostsManager() {
             </TextField>
             <TextField
               label="Union/Guild"
-              defaultValue={editingRate?.union || ''}
+              value={formData.union || ''}
+              onChange={(e) => setFormData({ ...formData, union: e.target.value })}
               fullWidth
             />
             <TextField
               label="Day Rate ($)"
               type="number"
-              defaultValue={editingRate?.dayRate || ''}
+              value={formData.dayRate ?? ''}
+              onChange={(e) => setFormData({ ...formData, dayRate: parseFloat(e.target.value) })}
               fullWidth
             />
             <TextField
               label="Week Rate ($)"
               type="number"
-              defaultValue={editingRate?.weekRate || ''}
+              value={formData.weekRate ?? ''}
+              onChange={(e) => setFormData({ ...formData, weekRate: parseFloat(e.target.value) })}
               fullWidth
             />
             <TextField
               label="Source"
-              defaultValue={editingRate?.source || ''}
+              value={formData.source || ''}
+              onChange={(e) => setFormData({ ...formData, source: e.target.value })}
               fullWidth
               sx={{ gridColumn: '1 / -1' }}
             />
@@ -416,6 +419,7 @@ export function CrewCostsManager() {
           </Button>
           <Button
             variant="contained"
+            onClick={handleSave}
             sx={{
               bgcolor: '#D4AF37',
               color: '#000000',

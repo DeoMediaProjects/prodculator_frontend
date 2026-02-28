@@ -11,6 +11,8 @@ import {
   ListItemText,
   Divider,
   LinearProgress,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import {
   TrendingUp,
@@ -21,17 +23,25 @@ import {
   Warning,
   Info,
 } from '@mui/icons-material';
+import { adminApi } from '@/services/admin.api';
+import type { AdminMetrics } from '@/services/admin.types';
 
 export function AdminOverview() {
-  // Mock data - in production this would come from the backend
-  const stats = {
-    totalUsers: 1247,
-    activeSubscriptions: 342,
-    monthlyRevenue: 48920,
-    scriptsAnalyzed: 892,
-    reportsSent: 1034,
-    b2bClients: 12,
-  };
+  const [metrics, setMetrics] = useState<AdminMetrics | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(true);
+  const [metricsError, setMetricsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await adminApi.getMetrics();
+      if (error) {
+        setMetricsError(error);
+      } else {
+        setMetrics(data);
+      }
+      setMetricsLoading(false);
+    })();
+  }, []);
 
   const recentActivity = [
     { time: '5 mins ago', action: 'New script analysis completed', user: 'user@example.com' },
@@ -63,6 +73,9 @@ export function AdminOverview() {
       </Typography>
 
       {/* Key Metrics */}
+      {metricsError && (
+        <Alert severity="error" sx={{ mb: 3 }}>{metricsError}</Alert>
+      )}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <Card sx={{ bgcolor: '#0a0a0a', border: '1px solid rgba(212, 175, 55, 0.2)' }}>
@@ -71,12 +84,13 @@ export function AdminOverview() {
                 <Typography variant="h6" sx={{ color: '#ffffff' }}>Total Users</Typography>
                 <People sx={{ color: '#D4AF37' }} />
               </Box>
-              <Typography variant="h3" sx={{ fontWeight: 700, color: '#D4AF37' }}>
-                {stats.totalUsers.toLocaleString()}
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#66bb6a', mt: 1 }}>
-                +12% from last month
-              </Typography>
+              {metricsLoading ? (
+                <CircularProgress size={28} sx={{ color: '#D4AF37' }} />
+              ) : (
+                <Typography variant="h3" sx={{ fontWeight: 700, color: '#D4AF37' }}>
+                  {metrics ? metrics.total_users.toLocaleString() : '—'}
+                </Typography>
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -88,12 +102,13 @@ export function AdminOverview() {
                 <Typography variant="h6" sx={{ color: '#ffffff' }}>Active Subscriptions</Typography>
                 <CheckCircle sx={{ color: '#66bb6a' }} />
               </Box>
-              <Typography variant="h3" sx={{ fontWeight: 700, color: '#D4AF37' }}>
-                {stats.activeSubscriptions}
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#66bb6a', mt: 1 }}>
-                +8% from last month
-              </Typography>
+              {metricsLoading ? (
+                <CircularProgress size={28} sx={{ color: '#D4AF37' }} />
+              ) : (
+                <Typography variant="h3" sx={{ fontWeight: 700, color: '#D4AF37' }}>
+                  {metrics ? metrics.active_subscriptions.toLocaleString() : '—'}
+                </Typography>
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -102,15 +117,16 @@ export function AdminOverview() {
           <Card sx={{ bgcolor: '#0a0a0a', border: '1px solid rgba(212, 175, 55, 0.2)' }}>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="h6" sx={{ color: '#ffffff' }}>Monthly Revenue</Typography>
+                <Typography variant="h6" sx={{ color: '#ffffff' }}>Monthly Revenue (USD)</Typography>
                 <AttachMoney sx={{ color: '#D4AF37' }} />
               </Box>
-              <Typography variant="h3" sx={{ fontWeight: 700, color: '#D4AF37' }}>
-                ${stats.monthlyRevenue.toLocaleString()}
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#66bb6a', mt: 1 }}>
-                +15% from last month
-              </Typography>
+              {metricsLoading ? (
+                <CircularProgress size={28} sx={{ color: '#D4AF37' }} />
+              ) : (
+                <Typography variant="h3" sx={{ fontWeight: 700, color: '#D4AF37' }}>
+                  {metrics ? `$${metrics.mrr_usd.toLocaleString()}` : '—'}
+                </Typography>
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -119,15 +135,16 @@ export function AdminOverview() {
           <Card sx={{ bgcolor: '#0a0a0a', border: '1px solid rgba(212, 175, 55, 0.2)' }}>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="h6" sx={{ color: '#ffffff' }}>Scripts Analyzed</Typography>
+                <Typography variant="h6" sx={{ color: '#ffffff' }}>Total Reports</Typography>
                 <Assessment sx={{ color: '#D4AF37' }} />
               </Box>
-              <Typography variant="h3" sx={{ fontWeight: 700, color: '#D4AF37' }}>
-                {stats.scriptsAnalyzed}
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#a0a0a0', mt: 1 }}>
-                This month
-              </Typography>
+              {metricsLoading ? (
+                <CircularProgress size={28} sx={{ color: '#D4AF37' }} />
+              ) : (
+                <Typography variant="h3" sx={{ fontWeight: 700, color: '#D4AF37' }}>
+                  {metrics ? metrics.total_reports.toLocaleString() : '—'}
+                </Typography>
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -136,15 +153,16 @@ export function AdminOverview() {
           <Card sx={{ bgcolor: '#0a0a0a', border: '1px solid rgba(212, 175, 55, 0.2)' }}>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="h6" sx={{ color: '#ffffff' }}>Reports Sent</Typography>
+                <Typography variant="h6" sx={{ color: '#ffffff' }}>Reports This Month</Typography>
                 <TrendingUp sx={{ color: '#D4AF37' }} />
               </Box>
-              <Typography variant="h3" sx={{ fontWeight: 700, color: '#D4AF37' }}>
-                {stats.reportsSent}
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#a0a0a0', mt: 1 }}>
-                This month
-              </Typography>
+              {metricsLoading ? (
+                <CircularProgress size={28} sx={{ color: '#D4AF37' }} />
+              ) : (
+                <Typography variant="h3" sx={{ fontWeight: 700, color: '#D4AF37' }}>
+                  {metrics ? metrics.reports_this_month.toLocaleString() : '—'}
+                </Typography>
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -153,15 +171,16 @@ export function AdminOverview() {
           <Card sx={{ bgcolor: '#0a0a0a', border: '1px solid rgba(212, 175, 55, 0.2)' }}>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="h6" sx={{ color: '#ffffff' }}>B2B Clients</Typography>
+                <Typography variant="h6" sx={{ color: '#ffffff' }}>Conversion Rate</Typography>
                 <CheckCircle sx={{ color: '#66bb6a' }} />
               </Box>
-              <Typography variant="h3" sx={{ fontWeight: 700, color: '#D4AF37' }}>
-                {stats.b2bClients}
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#66bb6a', mt: 1 }}>
-                +3 this quarter
-              </Typography>
+              {metricsLoading ? (
+                <CircularProgress size={28} sx={{ color: '#D4AF37' }} />
+              ) : (
+                <Typography variant="h3" sx={{ fontWeight: 700, color: '#D4AF37' }}>
+                  {metrics ? `${metrics.conversion_rate_percent.toFixed(1)}%` : '—'}
+                </Typography>
+              )}
             </CardContent>
           </Card>
         </Grid>

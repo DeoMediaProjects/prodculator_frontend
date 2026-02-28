@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -30,6 +30,7 @@ import {
   Switch,
   FormControlLabel,
   Autocomplete,
+  CircularProgress,
 } from '@mui/material';
 import {
   Add,
@@ -44,7 +45,7 @@ import {
   EmojiEvents,
 } from '@mui/icons-material';
 import { Festival, FestivalDeadline } from '@/app/types/festival';
-import { mockFestivals } from '@/app/data/festivals-mock';
+import { adminApi } from '@/services/admin.api';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -62,8 +63,22 @@ function TabPanel({ children, value, index }: TabPanelProps) {
 
 export function FestivalsManager() {
   const [currentTab, setCurrentTab] = useState(0);
-  const [festivals, setFestivals] = useState<Festival[]>(mockFestivals);
+  const [festivals, setFestivals] = useState<Festival[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await adminApi.getFestivals();
+      if (error) {
+        setFetchError(error);
+      } else {
+        setFestivals(data?.items ?? []);
+      }
+      setLoading(false);
+    })();
+  }, []);
   const [editingFestival, setEditingFestival] = useState<Festival | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [festivalToDelete, setFestivalToDelete] = useState<Festival | null>(null);
@@ -140,25 +155,26 @@ export function FestivalsManager() {
     setEditingFestival(null);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (editingFestival) {
-      // Update existing festival
-      setFestivals(festivals.map(f =>
-        f.id === editingFestival.id
-          ? { ...formData as Festival, id: editingFestival.id, updatedAt: new Date().toISOString() }
-          : f
-      ));
+      const payload: Festival = { ...formData as Festival, id: editingFestival.id, updatedAt: new Date().toISOString() };
+      const { data, error } = await adminApi.updateFestival(editingFestival.id, payload);
+      if (!error && data) {
+        setFestivals(festivals.map(f => f.id === editingFestival.id ? data : f));
+      }
     } else {
-      // Add new festival
-      const newFestival: Festival = {
+      const payload: Festival = {
         ...formData as Festival,
-        id: `fest-${Date.now()}`,
+        id: '',
         currentStatus: 'upcoming',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         lastVerifiedAt: new Date().toISOString(),
       };
-      setFestivals([...festivals, newFestival]);
+      const { data, error } = await adminApi.createFestival(payload);
+      if (!error && data) {
+        setFestivals([...festivals, data]);
+      }
     }
     handleCloseDialog();
   };
@@ -168,20 +184,29 @@ export function FestivalsManager() {
     setDeleteConfirmOpen(true);
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (festivalToDelete) {
-      setFestivals(festivals.filter(f => f.id !== festivalToDelete.id));
+      const { error } = await adminApi.deleteFestival(festivalToDelete.id);
+      if (!error) {
+        setFestivals(festivals.filter(f => f.id !== festivalToDelete.id));
+      }
     }
     setDeleteConfirmOpen(false);
     setFestivalToDelete(null);
   };
 
-  const handleToggleVerified = (festivalId: string) => {
-    setFestivals(festivals.map(f =>
-      f.id === festivalId
-        ? { ...f, verified: !f.verified, lastVerifiedAt: !f.verified ? new Date().toISOString() : f.lastVerifiedAt }
-        : f
-    ));
+  const handleToggleVerified = async (festivalId: string) => {
+    const target = festivals.find(f => f.id === festivalId);
+    if (!target) return;
+    const payload: Festival = {
+      ...target,
+      verified: !target.verified,
+      lastVerifiedAt: !target.verified ? new Date().toISOString() : target.lastVerifiedAt,
+    };
+    const { data, error } = await adminApi.updateFestival(festivalId, payload);
+    if (!error && data) {
+      setFestivals(festivals.map(f => f.id === festivalId ? data : f));
+    }
   };
 
   const addDeadline = () => {
@@ -253,6 +278,15 @@ export function FestivalsManager() {
           Add Festival
         </Button>
       </Box>
+
+      {fetchError && (
+        <Alert severity="error" sx={{ mb: 3 }}>{fetchError}</Alert>
+      )}
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress sx={{ color: '#D4AF37' }} />
+        </Box>
+      )}
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>

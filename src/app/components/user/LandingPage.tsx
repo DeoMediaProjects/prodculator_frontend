@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router';
 import {
   CloudUpload,
   Assignment,
-  Menu as MenuIcon,
 } from '@mui/icons-material';
 import exampleLogo from '@/assets/2ac5b205356b38916f5ff32008dfa103d8ffc2cb.png';
 import grantifyBanner from '@/assets/524910a57dfd11f1e00b5b105577b194b5ba8e33.png';
@@ -15,7 +14,7 @@ import { useAuth } from '@/app/contexts/AuthContext';
 
 export function LandingPage() {
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   return (
     <Box sx={{ bgcolor: '#000000', minHeight: '100vh', position: 'relative', overflow: 'hidden' }}  >
@@ -182,34 +181,23 @@ export function LandingPage() {
                   </Button>
                 </>
               )}
-              <Box sx={{ display: { xs: 'none', xl: 'block' } }}>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    color: '#000000',
-                    fontWeight: 600,
-                  }}
-                >
-                  PRODCULATOR
-                </Typography>
-              </Box>
-              <Box
+              <Button
+                variant="text"
+                size="small"
+                onClick={() => navigate('/admin/login')}
                 sx={{
-                  width: 40,
-                  height: 40,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
+                  color: '#888888',
+                  fontSize: '0.75rem',
+                  textTransform: 'none',
+                  fontWeight: 500,
                   '&:hover': {
+                    color: '#000000',
                     bgcolor: 'rgba(0,0,0,0.05)',
                   },
-                  borderRadius: '4px',
                 }}
-                onClick={() => navigate('/admin')}
               >
-                <MenuIcon sx={{ color: '#000000' }} />
-              </Box>
+                Admin Login
+              </Button>
             </Box>
           </Box>
         </Container>

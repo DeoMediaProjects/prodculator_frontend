@@ -136,14 +136,32 @@ export class AuthService {
 
   async adminSignIn(email: string, password: string): Promise<{ user: AuthUser | null; error: string | null }> {
     try {
-      const data = await apiClient.post<TokenResponse>('/api/auth/admin/signin', { email, password });
-      if (data.user.user_type !== 'admin') {
-        return { user: null, error: 'Access denied - admin privileges required' };
-      }
+      const data = await apiClient.post<TokenResponse>('/api/admin/auth/signin', { email, password });
       setTokens(data.access_token, data.refresh_token);
       return { user: data.user, error: null };
     } catch (error) {
       return { user: null, error: error instanceof Error ? error.message : 'Admin sign in failed' };
+    }
+  }
+
+  async adminSignOut(): Promise<{ error: string | null }> {
+    try {
+      await apiClient.post('/api/admin/auth/signout', undefined, { auth: true });
+      clearTokens();
+      return { error: null };
+    } catch (error) {
+      clearTokens();
+      return { error: error instanceof Error ? error.message : 'Admin sign out failed' };
+    }
+  }
+
+  async getAdminUser(): Promise<AuthUser | null> {
+    try {
+      const token = getAccessToken();
+      if (!token) return null;
+      return await apiClient.get<AuthUser>('/api/admin/auth/me', { auth: true });
+    } catch (_error) {
+      return null;
     }
   }
 
