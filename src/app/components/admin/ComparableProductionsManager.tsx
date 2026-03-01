@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -36,8 +36,11 @@ export function ComparableProductionsManager() {
   const [editingProduction, setEditingProduction] = useState<ComparableProduction | null>(null);
   const [formData, setFormData] = useState<Partial<ComparableProduction>>({});
   const [syncing, setSyncing] = useState(false);
+  const didFetch = useRef(false);
 
   useEffect(() => {
+    if (didFetch.current) return;
+    didFetch.current = true;
     (async () => {
       const { data, error } = await adminApi.getComparables();
       if (error) {

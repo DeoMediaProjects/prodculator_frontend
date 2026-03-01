@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -52,8 +52,11 @@ export function IncentiveDataManager(_props?: any) {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [editingIncentive, setEditingIncentive] = useState<IncentiveData | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<IncentiveData>>({});
+  const didFetch = useRef(false);
 
   useEffect(() => {
+    if (didFetch.current) return;
+    didFetch.current = true;
     (async () => {
       const { data, error } = await adminApi.getIncentives();
       if (error) {
