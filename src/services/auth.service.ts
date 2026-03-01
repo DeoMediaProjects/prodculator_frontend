@@ -154,7 +154,6 @@ export class AuthService {
       clearTokens();
       return { error: null };
     } catch (error) {
-      clearTokens();
       return { error: error instanceof Error ? error.message : 'Admin sign out failed' };
     }
   }

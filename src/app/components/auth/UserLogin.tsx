@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { useAuth } from '@/app/contexts/AuthContext';
+import { LoadingSpinner } from '@/app/components/common/LoadingSpinner';
 import exampleLogo from '@/assets/2ac5b205356b38916f5ff32008dfa103d8ffc2cb.png';
 
 export function UserLogin() {
@@ -57,6 +58,7 @@ export function UserLogin() {
         overflow: 'hidden',
       }}
     >
+      {loading && <LoadingSpinner overlay message="Signing in..." />}
       {/* Background gradient */}
       <Box
         sx={{
@@ -188,7 +190,7 @@ export function UserLogin() {
                 },
               }}
             >
-              {loading ? 'Signing In...' : 'Sign In'}
+              Sign In
             </Button>
           </Box>
 

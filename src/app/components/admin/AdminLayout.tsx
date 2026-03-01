@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router';
 import {
   Box,
@@ -11,8 +12,8 @@ import {
   ListItemIcon,
   ListItemText,
   Container,
-  Button,
-  Divider,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import {
   Dashboard,
@@ -23,7 +24,6 @@ import {
   Movie,
   Settings,
   TrendingUp,
-  Home,
   AccountCircle,
   SupervisorAccount,
   Logout,
@@ -33,13 +33,16 @@ import {
   Videocam,
 } from '@mui/icons-material';
 import { useAuth } from '@/app/contexts/AuthContext';
+import { LoadingSpinner } from '@/app/components/common/LoadingSpinner';
 
 const drawerWidth = 240;
 
 export function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { adminLogout, hasAdminPermission } = useAuth();
+  const { adminLogout } = useAuth();
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const menuItems = [
     { label: 'Overview', path: '/admin/overview', icon: <Dashboard /> },
@@ -58,9 +61,16 @@ export function AdminLayout() {
     { label: 'User Management', path: '/admin/users', icon: <SupervisorAccount /> },
   ];
 
-  const handleLogout = () => {
-    adminLogout();
-    navigate('/admin/login');
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    const { error } = await adminLogout();
+    setLoggingOut(false);
+    if (error) {
+      setLogoutError(error);
+    } else {
+      navigate('/admin/login');
+    }
   };
 
   return (
@@ -101,7 +111,7 @@ export function AdminLayout() {
           </List>
           
           {/* Divider and User Links */}
-          <Box sx={{ borderTop: '1px solid rgba(212, 175, 55, 0.2)', mt: 2, pt: 2 }}>
+          {/* <Box sx={{ borderTop: '1px solid rgba(212, 175, 55, 0.2)', mt: 2, pt: 2 }}>
             <List>
               <ListItem disablePadding>
                 <ListItemButton onClick={() => navigate('/')}>
@@ -116,14 +126,16 @@ export function AdminLayout() {
                 </ListItemButton>
               </ListItem>
             </List>
-          </Box>
+          </Box> */}
           
           {/* Admin Actions */}
           <Box sx={{ mt: 2 }}>
             <List>
               <ListItem disablePadding>
-                <ListItemButton onClick={() => handleLogout()}>
-                  <ListItemIcon><Logout /></ListItemIcon>
+                <ListItemButton onClick={handleLogout} disabled={loggingOut}>
+                  <ListItemIcon>
+                    {loggingOut ? <LoadingSpinner size={20} /> : <Logout />}
+                  </ListItemIcon>
                   <ListItemText primary="Logout" />
                 </ListItemButton>
               </ListItem>
@@ -138,6 +150,19 @@ export function AdminLayout() {
           <Outlet />
         </Container>
       </Box>
+
+      {loggingOut && <LoadingSpinner overlay message="Signing out..." />}
+
+      <Snackbar
+        open={!!logoutError}
+        autoHideDuration={6000}
+        onClose={() => setLogoutError(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="error" onClose={() => setLogoutError(null)}>
+          Logout failed: {logoutError}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
