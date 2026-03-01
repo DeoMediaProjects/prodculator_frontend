@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -47,7 +47,7 @@ import {
   MonetizationOn,
 } from '@mui/icons-material';
 import { adminApi } from '@/services/admin.api';
-import type { Grant } from '@/services/admin.types';
+import type { Grant, CreateGrantPayload, BulkImportResult } from '@/services/admin.types';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -63,23 +63,61 @@ function TabPanel({ children, value, index }: TabPanelProps) {
   );
 }
 
+// Normalise a raw grant from the API — handles CSV-imported rows where the
+// backend may return eligibility as a semicolon-separated string or null,
+// and status/daysUntilDeadline may be absent if not computed server-side.
+function normalizeGrant(raw: any): Grant {
+  const deadline = new Date(raw.applicationDeadline || '');
+  const opens = new Date(raw.applicationOpens || '');
+  const now = new Date();
+  const daysUntil = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+  let status: Grant['status'] = raw.status;
+  if (!status) {
+    if (deadline < now) status = 'closed';
+    else if (daysUntil <= 14) status = 'closing-soon';
+    else if (opens <= now) status = 'open';
+    else status = 'opening-soon';
+  }
+
+  const eligibility: string[] = Array.isArray(raw.eligibility)
+    ? raw.eligibility
+    : typeof raw.eligibility === 'string' && raw.eligibility
+    ? raw.eligibility.split(';').map((s: string) => s.trim()).filter(Boolean)
+    : [];
+
+  return {
+    ...raw,
+    status,
+    eligibility,
+    daysUntilDeadline: typeof raw.daysUntilDeadline === 'number' ? raw.daysUntilDeadline : daysUntil,
+  };
+}
+
 export function GrantsManager() {
   const [currentTab, setCurrentTab] = useState(0);
   const [grants, setGrants] = useState<Grant[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const didFetch = useRef(false);
 
   useEffect(() => {
-    (async () => {
-      const { data, error } = await adminApi.getGrants();
-      if (error) {
-        setFetchError(error);
-      } else {
-        setGrants(data?.items ?? []);
-      }
-      setLoading(false);
-    })();
+    if (didFetch.current) return;
+    didFetch.current = true;
+    loadGrants();
   }, []);
+
+  const loadGrants = async () => {
+    setLoading(true);
+    setFetchError(null);
+    const { data, error } = await adminApi.getGrants();
+    if (error) {
+      setFetchError(error);
+    } else {
+      setGrants((data?.items ?? []).map(normalizeGrant));
+    }
+    setLoading(false);
+  };
 
   const [addGrantOpen, setAddGrantOpen] = useState(false);
   const [editGrantOpen, setEditGrantOpen] = useState(false);
@@ -126,8 +164,7 @@ export function GrantsManager() {
   };
 
   const handleAddGrant = async () => {
-    const payload: Grant = {
-      id: '',
+    const payload: CreateGrantPayload = {
       title: formData.title,
       territory: formData.territory,
       fundingBody: formData.fundingBody,
@@ -142,8 +179,6 @@ export function GrantsManager() {
       dataSource: 'manual',
       verified: formData.verified,
       isNew: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
       lastVerifiedAt: formData.verified ? new Date().toISOString() : undefined,
     };
     const { data, error } = await adminApi.createGrant(payload);
@@ -156,8 +191,7 @@ export function GrantsManager() {
 
   const handleEditGrant = async () => {
     if (!selectedGrant) return;
-    const payload: Grant = {
-      ...selectedGrant,
+    const payload: Partial<Grant> = {
       title: formData.title,
       territory: formData.territory,
       fundingBody: formData.fundingBody,
@@ -170,7 +204,6 @@ export function GrantsManager() {
       eligibility: formData.eligibility.split('\n').filter(e => e.trim()),
       websiteUrl: formData.websiteUrl,
       verified: formData.verified,
-      updatedAt: new Date().toISOString(),
       lastVerifiedAt: formData.verified ? new Date().toISOString() : selectedGrant.lastVerifiedAt,
     };
     const { data, error } = await adminApi.updateGrant(selectedGrant.id, payload);
@@ -556,6 +589,7 @@ export function GrantsManager() {
       <BulkImportDialog
         open={bulkImportOpen}
         onClose={() => setBulkImportOpen(false)}
+        onImportSuccess={loadGrants}
       />
     </Box>
   );
@@ -1082,11 +1116,60 @@ function GrantPreviewDialog({ open, onClose, grant, formatCurrency, getStatusCol
 }
 
 // Bulk Import Dialog Component
-function BulkImportDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function BulkImportDialog({
+  open,
+  onClose,
+  onImportSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onImportSuccess: () => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [result, setResult] = useState<BulkImportResult | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const handleClose = () => {
+    setResult(null);
+    setUploadError(null);
+    onClose();
+  };
+
+  const handleDownloadTemplate = () => {
+    const headers = 'title,territory,fundingBody,maxAmount,currency,applicationOpens,applicationDeadline,eligibility,websiteUrl,verified';
+    const example = 'BFI Film Fund,UK,British Film Institute,500000,GBP,2026-03-01,2026-06-30,UK-qualified productions;High-end drama,https://www.bfi.org.uk,true';
+    const csv = `${headers}\n${example}\n`;
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'grants_import_template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setResult(null);
+    setUploadError(null);
+    const { data, error } = await adminApi.bulkImportGrants(file);
+    setUploading(false);
+    if (error) {
+      setUploadError(error);
+    } else if (data) {
+      setResult(data);
+      if (data.imported > 0) onImportSuccess();
+    }
+    // reset the input so the same file can be re-uploaded if needed
+    e.target.value = '';
+  };
+
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       maxWidth="sm"
       fullWidth
       PaperProps={{
@@ -1103,6 +1186,7 @@ function BulkImportDialog({ open, onClose }: { open: boolean; onClose: () => voi
         <Alert severity="info" sx={{ mb: 3, bgcolor: 'rgba(33, 150, 243, 0.1)', '& .MuiAlert-icon': { color: '#2196F3' } }}>
           <Typography variant="body2" sx={{ color: '#2196F3' }}>
             Upload a CSV file with grant data. Download the template below for the correct format.
+            Eligibility values should be semicolon-separated.
           </Typography>
         </Alert>
 
@@ -1110,6 +1194,7 @@ function BulkImportDialog({ open, onClose }: { open: boolean; onClose: () => voi
           variant="outlined"
           startIcon={<Download />}
           fullWidth
+          onClick={handleDownloadTemplate}
           sx={{
             mb: 2,
             borderColor: '#D4AF37',
@@ -1126,22 +1211,44 @@ function BulkImportDialog({ open, onClose }: { open: boolean; onClose: () => voi
         <Button
           variant="contained"
           component="label"
-          startIcon={<Upload />}
+          startIcon={uploading ? <CircularProgress size={16} sx={{ color: '#000' }} /> : <Upload />}
           fullWidth
+          disabled={uploading}
           sx={{
             bgcolor: '#D4AF37',
             color: '#000000',
             fontWeight: 600,
             '&:hover': { bgcolor: '#E5C158' },
+            '&:disabled': { bgcolor: 'rgba(212, 175, 55, 0.4)' },
           }}
         >
-          Upload CSV File
-          <input type="file" accept=".csv" hidden />
+          {uploading ? 'Uploading...' : 'Upload CSV File'}
+          <input type="file" accept=".csv" hidden onChange={handleFileChange} />
         </Button>
+
+        {uploadError && (
+          <Alert severity="error" sx={{ mt: 2 }}>{uploadError}</Alert>
+        )}
+
+        {result && (
+          <Alert
+            severity={result.failed > 0 ? 'warning' : 'success'}
+            sx={{ mt: 2 }}
+          >
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {result.imported} imported, {result.failed} failed
+            </Typography>
+            {result.errors.map((err, i) => (
+              <Typography key={i} variant="caption" display="block" sx={{ mt: 0.5 }}>
+                Row {err.row}: {err.reason}
+              </Typography>
+            ))}
+          </Alert>
+        )}
       </DialogContent>
       <DialogActions sx={{ p: 2, borderTop: '1px solid rgba(212, 175, 55, 0.2)' }}>
-        <Button onClick={onClose} sx={{ color: '#a0a0a0' }}>
-          Cancel
+        <Button onClick={handleClose} sx={{ color: '#a0a0a0' }}>
+          {result ? 'Close' : 'Cancel'}
         </Button>
       </DialogActions>
     </Dialog>

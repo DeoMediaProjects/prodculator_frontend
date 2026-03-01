@@ -88,4 +88,14 @@ export interface Grant {
   lastVerifiedAt?: string;
 }
 
+// Payload for creating a grant — backend sets id, createdAt, updatedAt
+export type CreateGrantPayload = Omit<Grant, 'id' | 'createdAt' | 'updatedAt'>;
+
+// Response from bulk import
+export interface BulkImportResult {
+  imported: number;
+  failed: number;
+  errors: { row: number; reason: string }[];
+}
+
 // Festival is defined in src/app/types/festival.ts — import from there directly.

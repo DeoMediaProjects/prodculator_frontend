@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -40,8 +40,11 @@ export function CrewCostsManager() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRate, setEditingRate] = useState<CrewRate | null>(null);
   const [formData, setFormData] = useState<Partial<CrewRate>>({});
+  const didFetch = useRef(false);
 
   useEffect(() => {
+    if (didFetch.current) return;
+    didFetch.current = true;
     (async () => {
       const { data, error } = await adminApi.getCrewRates();
       if (error) {

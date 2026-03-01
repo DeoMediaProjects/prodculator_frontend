@@ -8,6 +8,7 @@ import {
   ADMIN_COMPARABLES_URL,
   adminComparableUrl,
   ADMIN_GRANTS_URL,
+  ADMIN_GRANTS_BULK_IMPORT_URL,
   adminGrantUrl,
   ADMIN_FESTIVALS_URL,
   adminFestivalUrl,
@@ -18,6 +19,8 @@ import type {
   CrewRate,
   ComparableProduction,
   Grant,
+  CreateGrantPayload,
+  BulkImportResult,
   PaginatedResponse,
 } from './admin.types';
 import type { Festival } from '@/app/types/festival';
@@ -30,9 +33,9 @@ function paginationQuery(limit = 50, offset = 0) {
 }
 
 // ── Metrics ───────────────────────────────────────────────────────────────────
-async function getMetrics(): ApiResult<AdminMetrics> {
+async function getMetrics(signal?: AbortSignal): ApiResult<AdminMetrics> {
   try {
-    const data = await apiClient.get<AdminMetrics>(ADMIN_METRICS_URL, { auth: true });
+    const data = await apiClient.get<AdminMetrics>(ADMIN_METRICS_URL, { auth: true, signal });
     return { data, error: null };
   } catch (e) {
     return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch metrics' };
@@ -40,11 +43,11 @@ async function getMetrics(): ApiResult<AdminMetrics> {
 }
 
 // ── Incentives ────────────────────────────────────────────────────────────────
-async function getIncentives(limit = 50, offset = 0): ApiResult<PaginatedResponse<IncentiveData>> {
+async function getIncentives(limit = 50, offset = 0, signal?: AbortSignal): ApiResult<PaginatedResponse<IncentiveData>> {
   try {
     const data = await apiClient.get<PaginatedResponse<IncentiveData>>(
       `${ADMIN_INCENTIVES_URL}${paginationQuery(limit, offset)}`,
-      { auth: true },
+      { auth: true, signal },
     );
     return { data, error: null };
   } catch (e) {
@@ -80,11 +83,11 @@ async function deleteIncentive(id: string): ApiResult<void> {
 }
 
 // ── Crew Costs ────────────────────────────────────────────────────────────────
-async function getCrewRates(limit = 50, offset = 0): ApiResult<PaginatedResponse<CrewRate>> {
+async function getCrewRates(limit = 50, offset = 0, signal?: AbortSignal): ApiResult<PaginatedResponse<CrewRate>> {
   try {
     const data = await apiClient.get<PaginatedResponse<CrewRate>>(
       `${ADMIN_CREW_COSTS_URL}${paginationQuery(limit, offset)}`,
-      { auth: true },
+      { auth: true, signal },
     );
     return { data, error: null };
   } catch (e) {
@@ -120,11 +123,11 @@ async function deleteCrewRate(id: string): ApiResult<void> {
 }
 
 // ── Comparables ───────────────────────────────────────────────────────────────
-async function getComparables(limit = 50, offset = 0): ApiResult<PaginatedResponse<ComparableProduction>> {
+async function getComparables(limit = 50, offset = 0, signal?: AbortSignal): ApiResult<PaginatedResponse<ComparableProduction>> {
   try {
     const data = await apiClient.get<PaginatedResponse<ComparableProduction>>(
       `${ADMIN_COMPARABLES_URL}${paginationQuery(limit, offset)}`,
-      { auth: true },
+      { auth: true, signal },
     );
     return { data, error: null };
   } catch (e) {
@@ -160,11 +163,11 @@ async function deleteComparable(id: string): ApiResult<void> {
 }
 
 // ── Grants ────────────────────────────────────────────────────────────────────
-async function getGrants(limit = 50, offset = 0): ApiResult<PaginatedResponse<Grant>> {
+async function getGrants(limit = 50, offset = 0, signal?: AbortSignal): ApiResult<PaginatedResponse<Grant>> {
   try {
     const data = await apiClient.get<PaginatedResponse<Grant>>(
       `${ADMIN_GRANTS_URL}${paginationQuery(limit, offset)}`,
-      { auth: true },
+      { auth: true, signal },
     );
     return { data, error: null };
   } catch (e) {
@@ -172,7 +175,7 @@ async function getGrants(limit = 50, offset = 0): ApiResult<PaginatedResponse<Gr
   }
 }
 
-async function createGrant(payload: Grant): ApiResult<Grant> {
+async function createGrant(payload: CreateGrantPayload): ApiResult<Grant> {
   try {
     const data = await apiClient.post<Grant>(ADMIN_GRANTS_URL, { payload }, { auth: true });
     return { data, error: null };
@@ -181,7 +184,18 @@ async function createGrant(payload: Grant): ApiResult<Grant> {
   }
 }
 
-async function updateGrant(id: string, payload: Grant): ApiResult<Grant> {
+async function bulkImportGrants(file: File): ApiResult<BulkImportResult> {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    const data = await apiClient.upload<BulkImportResult>(ADMIN_GRANTS_BULK_IMPORT_URL, formData, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to import grants' };
+  }
+}
+
+async function updateGrant(id: string, payload: Partial<Grant>): ApiResult<Grant> {
   try {
     const data = await apiClient.patch<Grant>(adminGrantUrl(id), { payload }, { auth: true });
     return { data, error: null };
@@ -200,11 +214,11 @@ async function deleteGrant(id: string): ApiResult<void> {
 }
 
 // ── Festivals ─────────────────────────────────────────────────────────────────
-async function getFestivals(limit = 50, offset = 0): ApiResult<PaginatedResponse<Festival>> {
+async function getFestivals(limit = 50, offset = 0, signal?: AbortSignal): ApiResult<PaginatedResponse<Festival>> {
   try {
     const data = await apiClient.get<PaginatedResponse<Festival>>(
       `${ADMIN_FESTIVALS_URL}${paginationQuery(limit, offset)}`,
-      { auth: true },
+      { auth: true, signal },
     );
     return { data, error: null };
   } catch (e) {
@@ -258,6 +272,7 @@ export const adminApi = {
   createGrant,
   updateGrant,
   deleteGrant,
+  bulkImportGrants,
   getFestivals,
   createFestival,
   updateFestival,
