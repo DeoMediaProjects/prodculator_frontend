@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff, AdminPanelSettings } from '@mui/icons-material';
 import { useAuth } from '@/app/contexts/AuthContext';
+import { LoadingSpinner } from '@/app/components/common/LoadingSpinner';
 
 export function AdminLogin() {
   const navigate = useNavigate();
@@ -62,6 +63,7 @@ export function AdminLogin() {
         overflow: 'hidden',
       }}
     >
+      {loading && <LoadingSpinner overlay message="Signing in..." />}
       {/* Background gradient */}
       <Box
         sx={{
@@ -177,7 +179,7 @@ export function AdminLogin() {
                 },
               }}
             >
-              {loading ? 'Signing In...' : 'Sign In'}
+              Sign In
             </Button>
           </Box>
 

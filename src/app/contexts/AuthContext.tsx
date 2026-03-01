@@ -58,7 +58,7 @@ interface AuthContextType {
   adminUser: AdminUser | null;
   isAdminAuthenticated: boolean;
   adminLogin: (email: string, password: string) => Promise<boolean>;
-  adminLogout: () => Promise<void>;
+  adminLogout: () => Promise<{ error: string | null }>;
   hasAdminPermission: (permission: keyof AdminPermissions) => boolean;
 }
 
@@ -251,9 +251,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
-  const adminLogout = async () => {
-    await authService.adminSignOut();
-    setAdminUser(null);
+  const adminLogout = async (): Promise<{ error: string | null }> => {
+    const result = await authService.adminSignOut();
+    if (!result.error) {
+      setAdminUser(null);
+    }
+    return result;
   };
 
   const hasAdminPermission = (permission: keyof AdminPermissions): boolean => {

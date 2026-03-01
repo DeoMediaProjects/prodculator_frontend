@@ -50,12 +50,57 @@ export function clearTokens() {
   emitAuthChange(false);
 }
 
+// ---------------------------------------------------------------------------
+// Token refresh interceptor
+// A singleton promise ensures that if multiple requests fail with 401
+// simultaneously, only one refresh call is made; the rest wait for it.
+// ---------------------------------------------------------------------------
+let refreshPromise: Promise<boolean> | null = null;
+
+async function attemptTokenRefresh(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    try {
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) return false;
+
+      const endpoint = isAdminSession() ? '/api/admin/auth/refresh' : '/api/auth/refresh';
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      if (!response.ok) return false;
+
+      const data = await response.json();
+      if (isAdminSession()) {
+        setTokensSilent(data.access_token, data.refresh_token);
+      } else {
+        setTokens(data.access_token, data.refresh_token);
+      }
+      return true;
+    } catch {
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
+// ---------------------------------------------------------------------------
+// Core request function
+// ---------------------------------------------------------------------------
 type RequestOptions = RequestInit & {
   auth?: boolean;
+  _isRetry?: boolean; // internal — prevents infinite refresh loops
 };
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { auth = false, headers, ...init } = options;
+  const { auth = false, _isRetry = false, headers, ...init } = options;
   const requestHeaders = new Headers(headers || {});
   if (auth) {
     const token = getAccessToken();
@@ -68,6 +113,17 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     ...init,
     headers: requestHeaders,
   });
+
+  // On 401, attempt a silent token refresh and retry the request once.
+  // The _isRetry guard prevents an infinite loop if the refresh itself fails.
+  if (response.status === 401 && auth && !_isRetry) {
+    const refreshed = await attemptTokenRefresh();
+    if (refreshed) {
+      return request<T>(path, { ...options, _isRetry: true });
+    }
+    // Refresh failed — the session is unrecoverable; force a logout.
+    clearTokens();
+  }
 
   const contentType = response.headers.get('content-type') || '';
   const payload = contentType.includes('application/json')
@@ -118,4 +174,3 @@ export const apiClient = {
       body: formData,
     }),
 };
-
