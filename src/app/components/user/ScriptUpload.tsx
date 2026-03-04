@@ -11,7 +11,6 @@ import {
   FormControl,
   InputLabel,
   Select,
-  SelectChangeEvent,
   OutlinedInput,
   Chip,
   LinearProgress,
@@ -20,7 +19,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Divider,
   Grid,
   Checkbox,
   FormControlLabel,
@@ -48,7 +46,7 @@ export function ScriptUpload() {
   const [format, setFormat] = useState('');
   const [country, setCountry] = useState('');
   const [stateProvince, setStateProvince] = useState('');
-  const [cameraEquipment, setCameraEquipment] = useState('');
+  const [cameraEquipment, setCameraEquipment] = useState<string[]>([]);
   const [crewSize, setCrewSize] = useState('');
   const [principalCast, setPrincipalCast] = useState('');
   const [supportingCast, setSupportingCast] = useState('');
@@ -60,35 +58,26 @@ export function ScriptUpload() {
   const [error, setError] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
-  // Production Base fields
-  const [productionBase, setProductionBase] = useState('uk');
-  const [locationStrategy, setLocationStrategy] = useState('open-international');
-  const [territoriesConsidering, setTerritoriesConsidering] = useState<string[]>(['uk', 'malta', 'hungary']);
-  const [productionPriority, setProductionPriority] = useState('full-picture');
+  const [targetAudience, setTargetAudience] = useState('');
+  const [language, setLanguage] = useState('');
+
+  // Production strategy fields
+  const [locationStrategy, setLocationStrategy] = useState('open');
+  const [territoriesConsidering, setTerritoriesConsidering] = useState<string[]>(['UK', 'Malta', 'Hungary']);
+  const [productionPriority, setProductionPriority] = useState('full');
 
   // ✅ SECTION 2a: Genre options - expanded list (no pre-selection)
   const genreOptions = [
-    'Action', 'Drama', 'Thriller', 'Comedy', 'Romance', 'Mystery', 'Horror', 
-    'Sci-Fi', 'Fantasy', 'Historical', 'Period Drama', 'Crime', 'Noir', 
-    'Adventure', 'Biopic', 'War', 'Heist', 'Documentary Drama', 'Family', 
-    'Supernatural', 'Sports'
+    'Drama', 'Thriller', 'Sci-Fi', 'Horror', 'Comedy', 'Romance', 'Action',
+    'Adventure', 'Fantasy', 'Mystery', 'Documentary', 'Biopic', 'Period',
+    'Western', 'Animation', 'Musical', 'Crime', 'War', 'Sports', 'Family'
   ];
 
   // ✅ SECTION 2c: Format options - expanded list
   const formatOptions = [
-    { value: 'feature', label: 'Feature Film' },
-    { value: 'short', label: 'Short Film' },
-    { value: 'series', label: 'TV Series' },
-    { value: 'limited-series', label: 'Limited Series' },
-    { value: 'miniseries', label: 'Mini-Series' },
-    { value: 'documentary', label: 'Documentary' },
-    { value: 'docuseries', label: 'Docuseries' },
-    { value: 'animated-feature', label: 'Animated Feature' },
-    { value: 'animation-series', label: 'Animation Series' },
-    { value: 'commercial', label: 'Commercial' },
-    { value: 'music-video', label: 'Music Video' },
-    { value: 'interactive', label: 'Interactive' },
-    { value: 'vr', label: 'VR' },
+    'Feature Film', 'Short', 'TV Series', 'Limited Series', 'Mini-Series',
+    'Documentary', 'Docuseries', 'Animated Feature', 'Animation Series',
+    'Commercial', 'Music Video', 'Interactive', 'VR',
   ];
 
   // ✅ SECTION 2e: Camera equipment - full expanded list
@@ -96,26 +85,10 @@ export function ScriptUpload() {
   // Camera flags: Film (35mm/16mm) → lab processing costs; IMAX → certified facility availability; 
   // DJI Drone → permit requirements; multiple selections → combined transport & insurance costs
   const cameraOptions = [
-    'ARRI Alexa 35',
-    'ARRI Alexa Mini LF',
-    'ARRI Alexa Classic',
-    'RED V-RAPTOR',
-    'RED KOMODO-X',
-    'RED MONSTRO 8K',
-    'Sony VENICE 2',
-    'Sony FX9',
-    'Sony FX6',
-    'Blackmagic URSA Mini Pro 12K',
-    'Blackmagic Pocket 6K',
-    'Canon EOS C70',
-    'Canon EOS C300 Mk III',
-    'Panavision Millennium DXL2',
-    'IMAX Digital',
-    'Film — 35mm',
-    'Film — 16mm',
-    'DJI Ronin 4D (Drone/Aerial)',
-    'Multiple',
-    'TBD'
+    'ARRI Alexa 35', 'RED V-RAPTOR', 'Sony VENICE 2', 'Film 35mm',
+    'Blackmagic Cinema', 'Canon C70', 'Sony FX9', 'Panavision', 'IMAX',
+    'DJI Drone', 'GoPro', 'iPhone', 'Sony Alpha', 'Sony A7S III',
+    'Canon EOS R5', 'Phantom High Speed', 'Kinefinity Terra', 'Other',
   ];
 
   // State/Province options based on country
@@ -138,15 +111,15 @@ export function ScriptUpload() {
   // Get state/province options based on selected country
   const getStateProvinceOptions = () => {
     switch (country) {
-      case 'usa': return usaStates;
-      case 'canada': return canadaProvinces;
-      case 'australia': return australiaStates;
+      case 'USA': return usaStates;
+      case 'Canada': return canadaProvinces;
+      case 'Australia': return australiaStates;
       default: return [];
     }
   };
 
   // Show state/province field for countries with regional incentives
-  const showStateProvince = ['usa', 'canada', 'australia'].includes(country);
+  const showStateProvince = ['USA', 'Canada', 'Australia'].includes(country);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -166,28 +139,32 @@ export function ScriptUpload() {
     }
   };
 
-  const validateForm = () => {
-    if (!file) return 'Please upload a script file';
+  const validateForm = (requireFile = true) => {
+    if (requireFile && !file) return 'Please upload a script file';
     if (!title) return 'Project title is required';
     if (genres.length === 0) return 'Please select at least one genre';
     if (!budgetRange) return 'Budget range is required';
     if (!format) return 'Format is required';
     if (!country) return 'Primary production country is required';
-    if (!filmingStart) return 'Filming start date is required';
-    if (!filmingDuration) return 'Filming duration is required';
     return null;
   };
 
   const handleGenerateReport = () => {
-    const validationError = validateForm();
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-    
     if (!isAuthenticated) {
+      // Preview — file not required
+      const validationError = validateForm(false);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
       setEmailModalOpen(true);
     } else {
+      // Full report — file required
+      const validationError = validateForm(true);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
       if (!user || (user.plan === 'free' && user.reportsUsed >= 1)) {
         setError('You have used your free report. Please upgrade to continue.');
         navigate('/pricing');
@@ -204,17 +181,22 @@ export function ScriptUpload() {
     try {
       const metadata: ScriptMetadata = {
         title,
-        genre: genres.join(', '),
+        genre: genres,
         budget: budgetRange,
         format,
         country,
+        locationStrategy,
+        productionPriority,
         stateProvince: stateProvince || undefined,
-        cameraEquipment: cameraEquipment || undefined,
-        crewSize: crewSize || undefined,
-        principalCast: principalCast || undefined,
-        supportingCast: supportingCast || undefined,
-        filmingStart,
-        filmingDuration,
+        territoriesConsidering: territoriesConsidering.length ? territoriesConsidering : undefined,
+        filmingStart: filmingStart || undefined,
+        filmingDuration: filmingDuration || undefined,
+        cameraEquipment: cameraEquipment.length ? cameraEquipment : undefined,
+        crewSize: crewSize ? Number(crewSize) : undefined,
+        principalCast: principalCast ? Number(principalCast) : undefined,
+        supportingCast: supportingCast ? Number(supportingCast) : undefined,
+        targetAudience: targetAudience || undefined,
+        language: language || undefined,
       };
 
       await generateAnalysis(file!, metadata);
@@ -248,20 +230,25 @@ export function ScriptUpload() {
     try {
       const metadata: ScriptMetadata = {
         title,
-        genre: genres.join(', '),
+        genre: genres,
         budget: budgetRange,
         format,
         country,
+        locationStrategy,
+        productionPriority,
         stateProvince: stateProvince || undefined,
-        cameraEquipment: cameraEquipment || undefined,
-        crewSize: crewSize || undefined,
-        principalCast: principalCast || undefined,
-        supportingCast: supportingCast || undefined,
-        filmingStart,
-        filmingDuration,
+        territoriesConsidering: territoriesConsidering.length ? territoriesConsidering : undefined,
+        filmingStart: filmingStart || undefined,
+        filmingDuration: filmingDuration || undefined,
+        cameraEquipment: cameraEquipment.length ? cameraEquipment : undefined,
+        crewSize: crewSize ? Number(crewSize) : undefined,
+        principalCast: principalCast ? Number(principalCast) : undefined,
+        supportingCast: supportingCast ? Number(supportingCast) : undefined,
+        targetAudience: targetAudience || undefined,
+        language: language || undefined,
       };
 
-      await generatePreview(file!, metadata);
+      await generatePreview(metadata);
       markFreeReportUsed(email);
       navigate('/report/preview');
     } catch (err: any) {
@@ -391,10 +378,10 @@ export function ScriptUpload() {
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <FormControl fullWidth>
                       <InputLabel>Genre(s)</InputLabel>
-                      <Select
+                      <Select<string[]>
                         multiple
                         value={genres}
-                        onChange={(e: SelectChangeEvent<string[]>) => setGenres(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
+                        onChange={(e) => setGenres(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
                         input={<OutlinedInput label="Genre(s)" />}
                         renderValue={(selected) => (
                           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -421,12 +408,12 @@ export function ScriptUpload() {
                         onChange={(e) => setBudgetRange(e.target.value)}
                       >
                         {/* ✅ SECTION 2b: Budget Range - confirmed 6 options in GBP */}
-                        <MenuItem value="under-500k">Under £500K</MenuItem>
+                        <MenuItem value="<500k">Under £500K</MenuItem>
                         <MenuItem value="500k-2m">£500K–£2M</MenuItem>
                         <MenuItem value="2m-5m">£2M–£5M</MenuItem>
                         <MenuItem value="5m-15m">£5M–£15M</MenuItem>
                         <MenuItem value="15m-30m">£15M–£30M</MenuItem>
-                        <MenuItem value="30m-plus">£30M+</MenuItem>
+                        <MenuItem value="30m+">£30M+</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
@@ -440,7 +427,7 @@ export function ScriptUpload() {
                         onChange={(e) => setFormat(e.target.value)}
                       >
                         {formatOptions.map(f => (
-                          <MenuItem key={f.value} value={f.value}>{f.label}</MenuItem>
+                          <MenuItem key={f} value={f}>{f}</MenuItem>
                         ))}
                       </Select>
                     </FormControl>
@@ -454,19 +441,18 @@ export function ScriptUpload() {
                         label="Production Country" 
                         onChange={(e) => setCountry(e.target.value)}
                       >
-                        <MenuItem value="uk">United Kingdom</MenuItem>
-                        <MenuItem value="canada">Canada</MenuItem>
-                        <MenuItem value="usa">USA</MenuItem>
-                        <MenuItem value="australia">Australia</MenuItem>
-                        <MenuItem value="nz">New Zealand</MenuItem>
-                        <MenuItem value="malta">Malta</MenuItem>
-                        <MenuItem value="ireland">Ireland</MenuItem>
-                        <MenuItem value="france">France</MenuItem>
-                        <MenuItem value="germany">Germany</MenuItem>
-                        <MenuItem value="spain">Spain</MenuItem>
-                        <MenuItem value="czech">Czech Republic</MenuItem>
-                        <MenuItem value="hungary">Hungary</MenuItem>
-                        <MenuItem value="other">Other</MenuItem>
+                        <MenuItem value="UK">United Kingdom</MenuItem>
+                        <MenuItem value="Canada">Canada</MenuItem>
+                        <MenuItem value="USA">USA</MenuItem>
+                        <MenuItem value="Australia">Australia</MenuItem>
+                        <MenuItem value="Malta">Malta</MenuItem>
+                        <MenuItem value="Ireland">Ireland</MenuItem>
+                        <MenuItem value="France">France</MenuItem>
+                        <MenuItem value="Germany">Germany</MenuItem>
+                        <MenuItem value="Spain">Spain</MenuItem>
+                        <MenuItem value="Czech Republic">Czech Republic</MenuItem>
+                        <MenuItem value="Hungary">Hungary</MenuItem>
+                        <MenuItem value="Other">Other</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
@@ -497,8 +483,8 @@ export function ScriptUpload() {
                       <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
                         {[
                           { value: 'domestic', label: 'Shooting domestically' },
-                          { value: 'open-international', label: 'Open to international' },
-                          { value: 'specifically-international', label: 'Specifically international' },
+                          { value: 'open', label: 'Open to international' },
+                          { value: 'international', label: 'Specifically international' },
                         ].map((strategy) => (
                           <Button
                             key={strategy.value}
@@ -540,38 +526,37 @@ export function ScriptUpload() {
                       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                         {/* ✅ SECTION 2d: Full 15-territory list */}
                         {[
-                          { value: 'uk', label: 'UK' },
-                          { value: 'france', label: 'France' },
-                          { value: 'ireland', label: 'Ireland' },
-                          { value: 'malta', label: 'Malta' },
-                          { value: 'hungary', label: 'Hungary' },
-                          { value: 'czech', label: 'Czech Republic' },
-                          { value: 'spain', label: 'Spain' },
-                          { value: 'italy', label: 'Italy' }, // ✅ ADDED
-                          { value: 'georgia', label: 'Georgia USA' },
-                          { value: 'new-mexico', label: 'New Mexico USA' },
-                          { value: 'new-york', label: 'New York State' }, // ✅ ADDED
-                          { value: 'bc-canada', label: 'BC Canada' },
-                          { value: 'australia', label: 'Australia' },
-                          { value: 'new-zealand', label: 'New Zealand' }, // ✅ ADDED
-                          { value: 'south-africa', label: 'South Africa' },
-                          { value: 'portugal', label: 'Portugal' }, // ✅ ADDED
-                          { value: 'morocco', label: 'Morocco*' }, // ✅ ADDED (emerging, verify incentive)
-                          { value: 'serbia', label: 'Serbia' }, // ✅ ADDED
-                          { value: 'romania', label: 'Romania' }, // ✅ ADDED
-                          { value: 'open-all', label: 'Open to all' },
+                          { value: 'UK', label: 'UK' },
+                          { value: 'France', label: 'France' },
+                          { value: 'Malta', label: 'Malta' },
+                          { value: 'Hungary', label: 'Hungary' },
+                          { value: 'Czech Republic', label: 'Czech Republic' },
+                          { value: 'Spain', label: 'Spain' },
+                          { value: 'Italy', label: 'Italy' },
+                          { value: 'Georgia (USA)', label: 'Georgia (USA)' },
+                          { value: 'New Mexico', label: 'New Mexico' },
+                          { value: 'New York', label: 'New York' },
+                          { value: 'British Columbia', label: 'British Columbia' },
+                          { value: 'Australia', label: 'Australia' },
+                          { value: 'New Zealand', label: 'New Zealand' },
+                          { value: 'South Africa', label: 'South Africa' },
+                          { value: 'Portugal', label: 'Portugal' },
+                          { value: 'Morocco', label: 'Morocco' },
+                          { value: 'Serbia', label: 'Serbia' },
+                          { value: 'Romania', label: 'Romania' },
+                          { value: 'Open to all', label: 'Open to all' },
                         ].map((territory) => (
                           <Chip
                             key={territory.value}
                             label={territory.label}
                             onClick={() => {
                               // ✅ SECTION 10g: "Open to all" logic - de-emphasise other chips
-                              if (territory.value === 'open-all') {
-                                setTerritoriesConsidering(['open-all']);
+                              if (territory.value === 'Open to all') {
+                                setTerritoriesConsidering(['Open to all']);
                               } else if (territoriesConsidering.includes(territory.value)) {
                                 setTerritoriesConsidering(territoriesConsidering.filter(t => t !== territory.value));
                               } else {
-                                setTerritoriesConsidering([...territoriesConsidering.filter(t => t !== 'open-all'), territory.value]);
+                                setTerritoriesConsidering([...territoriesConsidering.filter(t => t !== 'Open to all'), territory.value]);
                               }
                             }}
                             sx={{
@@ -588,14 +573,14 @@ export function ScriptUpload() {
                                 bgcolor: 'rgba(212, 175, 55, 0.1)',
                                 color: '#D4AF37',
                                 border: '1px solid rgba(212, 175, 55, 0.5)',
-                                opacity: territoriesConsidering.includes('open-all') ? 0.5 : 1, // De-emphasise when "Open to all" selected
+                                opacity: territoriesConsidering.includes('Open to all') ? 0.5 : 1, // De-emphasise when "Open to all" selected
                                 '&:hover': { borderColor: '#D4AF37', bgcolor: 'rgba(212, 175, 55, 0.2)' },
                               }),
                             }}
                           />
                         ))}
                       </Box>
-                      {territoriesConsidering.includes('open-all') && (
+                      {territoriesConsidering.includes('Open to all') && (
                         <Typography variant="caption" sx={{ color: '#4caf50', display: 'block', mt: 1 }}>
                           We'll rank all 15 territories and recommend the best fit.
                         </Typography>
@@ -611,9 +596,9 @@ export function ScriptUpload() {
                       </Typography>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                         {[
-                          { value: 'max-incentive', label: 'Maximise incentive return' },
-                          { value: 'full-picture', label: 'Full picture — financial, creative and quality', badge: 'DEFAULT' },
-                          { value: 'creative-first', label: 'Location and creative fit first' },
+                          { value: 'incentive', label: 'Maximise incentive return' },
+                          { value: 'full', label: 'Full picture — financial, creative and quality', badge: 'DEFAULT' },
+                          { value: 'location', label: 'Location and creative fit first' },
                         ].map((priority) => (
                           <Box
                             key={priority.value}
@@ -686,10 +671,16 @@ export function ScriptUpload() {
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <FormControl fullWidth>
                       <InputLabel>Camera Equipment</InputLabel>
-                      <Select 
-                        value={cameraEquipment} 
-                        label="Camera Equipment" 
-                        onChange={(e) => setCameraEquipment(e.target.value)}
+                      <Select<string[]>
+                        multiple
+                        value={cameraEquipment}
+                        onChange={(e) => setCameraEquipment(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
+                        input={<OutlinedInput label="Camera Equipment" />}
+                        renderValue={(selected) => (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {selected.map((value) => <Chip key={value} label={value} size="small" sx={{ bgcolor: '#D4AF37', color: '#000' }} />)}
+                          </Box>
+                        )}
                       >
                         {cameraOptions.map(c => (
                           <MenuItem key={c} value={c}>{c}</MenuItem>
@@ -719,12 +710,32 @@ export function ScriptUpload() {
                   </Grid>
 
                   <Grid size={{ xs: 12, sm: 6 }}>
-                    <TextField 
-                      fullWidth 
-                      label="Supporting Cast" 
-                      type="number" 
-                      value={supportingCast} 
+                    <TextField
+                      fullWidth
+                      label="Supporting Cast"
+                      type="number"
+                      value={supportingCast}
                       onChange={(e) => setSupportingCast(e.target.value)}
+                    />
+                  </Grid>
+
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      fullWidth
+                      label="Target Audience"
+                      placeholder="e.g. 18-34, arthouse"
+                      value={targetAudience}
+                      onChange={(e) => setTargetAudience(e.target.value)}
+                    />
+                  </Grid>
+
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      fullWidth
+                      label="Primary Language"
+                      placeholder="e.g. English"
+                      value={language}
+                      onChange={(e) => setLanguage(e.target.value)}
                     />
                   </Grid>
                 </Grid>
