@@ -22,13 +22,24 @@ import {
   CardContent,
   Grid,
   Alert,
-  Switch,
-  FormControlLabel,
   CircularProgress,
+  Collapse,
 } from '@mui/material';
-import { Edit, Add, Sync, Warning, CheckCircle, Schedule, Info } from '@mui/icons-material';
+import {
+  Edit,
+  Delete,
+  Add,
+  Sync,
+  Warning,
+  CheckCircle,
+  Schedule,
+  Info,
+  Refresh,
+  ExpandMore,
+  ExpandLess,
+} from '@mui/icons-material';
 import { adminApi } from '@/services/admin.api';
-import type { CrewRate } from '@/services/admin.types';
+import type { CrewRate, PendingChange, SyncStatus, SyncSettings, SyncSettingsUpdate } from '@/services/admin.types';
 
 const territories = ['United Kingdom', 'British Columbia', 'Georgia (USA)', 'Malta', 'South Africa'];
 const categories = ['Camera', 'Lighting', 'Sound', 'Art Department', 'Production', 'Post-Production'];
@@ -40,18 +51,35 @@ export function CrewCostsManager() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRate, setEditingRate] = useState<CrewRate | null>(null);
   const [formData, setFormData] = useState<Partial<CrewRate>>({});
+
+  const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [showPendingChanges, setShowPendingChanges] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+  const [syncSettings, setSyncSettings] = useState<SyncSettings | null>(null);
+  const [syncSettingsForm, setSyncSettingsForm] = useState<SyncSettingsUpdate>({});
+  const [syncSettingsLoading, setSyncSettingsLoading] = useState(false);
+
   const didFetch = useRef(false);
 
   useEffect(() => {
     if (didFetch.current) return;
     didFetch.current = true;
     (async () => {
-      const { data, error } = await adminApi.getCrewRates();
-      if (error) {
-        setFetchError(error);
+      const [ratesRes, syncStatusRes, pendingRes] = await Promise.all([
+        adminApi.getCrewRates(),
+        adminApi.getCrewCostSyncStatus(),
+        adminApi.getCrewCostPendingChanges(),
+      ]);
+      if (ratesRes.error) {
+        setFetchError(ratesRes.error);
       } else {
-        setCrewRates(data?.items ?? []);
+        setCrewRates(ratesRes.data?.items ?? []);
       }
+      if (syncStatusRes.data) setSyncStatus(syncStatusRes.data);
+      if (pendingRes.data) setPendingChanges(pendingRes.data);
       setLoading(false);
     })();
   }, []);
@@ -99,6 +127,71 @@ export function CrewCostsManager() {
     handleClose();
   };
 
+  const handleDelete = async (id: string) => {
+    const { error } = await adminApi.deleteCrewRate(id);
+    if (!error) {
+      setCrewRates(crewRates.filter(r => r.id !== id));
+    }
+  };
+
+  const handleTriggerSync = async () => {
+    setSyncing(true);
+    const { error } = await adminApi.triggerCrewCostSync();
+    setSyncing(false);
+    if (!error) {
+      const [statusRes, pendingRes] = await Promise.all([
+        adminApi.getCrewCostSyncStatus(),
+        adminApi.getCrewCostPendingChanges(),
+      ]);
+      if (statusRes.data) setSyncStatus(statusRes.data);
+      if (pendingRes.data) setPendingChanges(pendingRes.data);
+    }
+  };
+
+  const handleApproveChange = async (change: PendingChange) => {
+    const { error } = await adminApi.approveCrewCostPendingChange(change.id);
+    if (!error) {
+      setPendingChanges(pendingChanges.filter(c => c.id !== change.id));
+      const { data } = await adminApi.getCrewRates();
+      if (data) setCrewRates(data.items);
+    }
+  };
+
+  const handleRejectChange = async (change: PendingChange) => {
+    const { error } = await adminApi.rejectCrewCostPendingChange(change.id);
+    if (!error) {
+      setPendingChanges(pendingChanges.filter(c => c.id !== change.id));
+    }
+  };
+
+  const handleOpenSyncSettings = async () => {
+    setSyncDialogOpen(true);
+    setSyncSettingsLoading(true);
+    const { data } = await adminApi.getCrewCostSyncSettings();
+    if (data) {
+      setSyncSettings(data);
+      setSyncSettingsForm({ schedule: data.schedule ?? undefined, enabled: data.enabled });
+    }
+    setSyncSettingsLoading(false);
+  };
+
+  const handleSaveSyncSettings = async () => {
+    const { data, error } = await adminApi.updateCrewCostSyncSettings(syncSettingsForm);
+    if (!error && data) {
+      setSyncSettings(data);
+      setSyncDialogOpen(false);
+    }
+  };
+
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return 'N/A';
+    try {
+      return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    } catch {
+      return dateStr;
+    }
+  };
+
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
@@ -114,6 +207,7 @@ export function CrewCostsManager() {
           <Button
             variant="outlined"
             startIcon={<Sync />}
+            onClick={handleOpenSyncSettings}
             sx={{
               borderColor: '#D4AF37',
               color: '#D4AF37',
@@ -171,9 +265,9 @@ export function CrewCostsManager() {
           Informational Data Only - Not Salary Advice
         </Typography>
         <Typography variant="body2" sx={{ color: '#a0a0a0', fontSize: '0.875rem' }}>
-          All crew rate data shown here is sourced from publicly available union agreements, guild rate cards, and industry surveys. 
-          This information is provided for reference purposes only and does not constitute salary advice or negotiation guidance. 
-          Actual rates may vary based on experience, project budget, location, and individual negotiations. 
+          All crew rate data shown here is sourced from publicly available union agreements, guild rate cards, and industry surveys.
+          This information is provided for reference purposes only and does not constitute salary advice or negotiation guidance.
+          Actual rates may vary based on experience, project budget, location, and individual negotiations.
           Always verify current rates with relevant unions, guilds, or industry sources before making hiring decisions.
         </Typography>
       </Alert>
@@ -189,13 +283,15 @@ export function CrewCostsManager() {
                   AI-Powered Auto-Sync Status
                 </Typography>
                 <Typography variant="caption" sx={{ color: '#a0a0a0' }}>
-                  Next scheduled check: <strong>April 1, 2026</strong> (Quarterly)
+                  Next scheduled check: <strong>{formatDate(syncStatus?.nextScheduledCheck)}</strong>
                 </Typography>
               </Box>
             </Box>
             <Button
               variant="contained"
-              startIcon={<Sync />}
+              startIcon={syncing ? <Refresh className="spin" /> : <Refresh />}
+              onClick={handleTriggerSync}
+              disabled={syncing}
               sx={{
                 bgcolor: '#D4AF37',
                 color: '#000000',
@@ -203,7 +299,7 @@ export function CrewCostsManager() {
                 '&:hover': { bgcolor: '#E5C158' },
               }}
             >
-              Run Sync Now
+              {syncing ? 'Syncing...' : 'Run Sync Now'}
             </Button>
           </Box>
 
@@ -220,7 +316,7 @@ export function CrewCostsManager() {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                   <CheckCircle sx={{ color: '#66bb6a', fontSize: 20 }} />
                   <Typography variant="h5" sx={{ color: '#ffffff', fontWeight: 700 }}>
-                    6
+                    {syncStatus?.territoriesSyncing ?? '—'}
                   </Typography>
                 </Box>
                 <Typography variant="caption" sx={{ color: '#a0a0a0' }}>
@@ -240,7 +336,7 @@ export function CrewCostsManager() {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                   <Warning sx={{ color: '#ffa726', fontSize: 20 }} />
                   <Typography variant="h5" sx={{ color: '#ffffff', fontWeight: 700 }}>
-                    2
+                    {pendingChanges.length}
                   </Typography>
                 </Box>
                 <Typography variant="caption" sx={{ color: '#a0a0a0' }}>
@@ -260,7 +356,7 @@ export function CrewCostsManager() {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                   <Schedule sx={{ color: '#42a5f5', fontSize: 20 }} />
                   <Typography variant="h5" sx={{ color: '#ffffff', fontWeight: 700 }}>
-                    18
+                    {syncStatus?.daysSinceLastCheck ?? '—'}
                   </Typography>
                 </Box>
                 <Typography variant="caption" sx={{ color: '#a0a0a0' }}>
@@ -273,20 +369,125 @@ export function CrewCostsManager() {
       </Card>
 
       {/* Pending Updates Alert */}
-      <Alert
-        severity="warning"
-        icon={<Warning />}
-        sx={{
-          mb: 4,
-          bgcolor: 'rgba(255, 167, 38, 0.1)',
-          border: '1px solid rgba(255, 167, 38, 0.3)',
-          color: '#ffffff',
-        }}
-      >
-        <Typography variant="body2">
-          <strong>2 update(s) detected</strong> by AI auto-sync and awaiting your review
-        </Typography>
-      </Alert>
+      {pendingChanges.length > 0 && (
+        <Alert
+          severity="warning"
+          icon={<Warning />}
+          sx={{
+            mb: 4,
+            bgcolor: 'rgba(255, 167, 38, 0.1)',
+            border: '1px solid rgba(255, 167, 38, 0.3)',
+            color: '#ffffff',
+          }}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              onClick={() => setShowPendingChanges(!showPendingChanges)}
+              endIcon={showPendingChanges ? <ExpandLess /> : <ExpandMore />}
+            >
+              {showPendingChanges ? 'Hide' : 'Review'}
+            </Button>
+          }
+        >
+          <Typography variant="body2">
+            <strong>{pendingChanges.length} update(s) detected</strong> by AI auto-sync and awaiting your review
+          </Typography>
+        </Alert>
+      )}
+
+      {/* Pending Changes Section */}
+      <Collapse in={showPendingChanges}>
+        <Paper sx={{ mb: 4, bgcolor: '#0a0a0a', border: '1px solid rgba(255, 152, 0, 0.3)' }}>
+          <Box sx={{ p: 2, bgcolor: 'rgba(255, 152, 0, 0.05)' }}>
+            <Typography variant="h6" sx={{ color: '#ffa726', fontWeight: 600 }}>
+              Pending Changes for Review
+            </Typography>
+          </Box>
+          {pendingChanges.map((change, index) => (
+            <Box
+              key={change.id}
+              sx={{
+                p: 3,
+                borderBottom: index < pendingChanges.length - 1 ? '1px solid rgba(255, 152, 0, 0.1)' : 'none',
+              }}
+            >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Box>
+                  <Typography variant="subtitle1" sx={{ color: '#ffffff', fontWeight: 600, mb: 1 }}>
+                    {change.territory} - {change.field}
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, md: 5 }}>
+                      <Typography variant="caption" sx={{ color: '#a0a0a0', display: 'block', mb: 0.5 }}>
+                        Current Value:
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: '#f44336', fontWeight: 600 }}>
+                        {change.currentValue ?? 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 2 }} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Typography sx={{ color: '#666' }}>→</Typography>
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 5 }}>
+                      <Typography variant="caption" sx={{ color: '#a0a0a0', display: 'block', mb: 0.5 }}>
+                        Detected Value:
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: '#66bb6a', fontWeight: 600 }}>
+                        {change.detectedValue}
+                      </Typography>
+                    </Grid>
+                  </Grid>
+                  <Box sx={{ mt: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+                    <Chip
+                      label={`${change.confidence.toUpperCase()} CONFIDENCE`}
+                      size="small"
+                      sx={{
+                        bgcolor: change.confidence === 'high' ? 'rgba(46, 125, 50, 0.2)' : 'rgba(255, 152, 0, 0.2)',
+                        color: change.confidence === 'high' ? '#66bb6a' : '#ffa726',
+                        fontWeight: 600,
+                      }}
+                    />
+                    <Typography variant="caption" sx={{ color: '#a0a0a0' }}>
+                      {change.source}
+                    </Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    startIcon={<CheckCircle />}
+                    onClick={() => handleApproveChange(change)}
+                    sx={{
+                      bgcolor: '#66bb6a',
+                      color: '#000000',
+                      '&:hover': { bgcolor: '#4caf50' },
+                    }}
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => handleRejectChange(change)}
+                    sx={{
+                      borderColor: '#666',
+                      color: '#a0a0a0',
+                      '&:hover': {
+                        borderColor: '#999',
+                        bgcolor: 'rgba(255, 255, 255, 0.05)',
+                      },
+                    }}
+                  >
+                    Reject
+                  </Button>
+                </Box>
+              </Box>
+            </Box>
+          ))}
+        </Paper>
+      </Collapse>
 
       <Paper sx={{ bgcolor: '#0a0a0a', border: '1px solid rgba(212, 175, 55, 0.2)' }}>
         <TableContainer>
@@ -326,9 +527,14 @@ export function CrewCostsManager() {
                   <TableCell sx={{ color: '#a0a0a0', fontSize: '0.875rem' }}>{rate.source}</TableCell>
                   <TableCell sx={{ color: '#a0a0a0', fontSize: '0.875rem' }}>{rate.lastUpdated}</TableCell>
                   <TableCell>
-                    <IconButton size="small" onClick={() => handleEdit(rate)}>
-                      <Edit sx={{ color: '#D4AF37', fontSize: 18 }} />
-                    </IconButton>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <IconButton size="small" onClick={() => handleEdit(rate)}>
+                        <Edit sx={{ color: '#D4AF37', fontSize: 18 }} />
+                      </IconButton>
+                      <IconButton size="small" onClick={() => handleDelete(rate.id)}>
+                        <Delete sx={{ color: '#f44336', fontSize: 18 }} />
+                      </IconButton>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}
@@ -338,8 +544,8 @@ export function CrewCostsManager() {
       </Paper>
 
       {/* Edit/Add Dialog */}
-      <Dialog 
-        open={dialogOpen} 
+      <Dialog
+        open={dialogOpen}
         onClose={handleClose}
         maxWidth="md"
         fullWidth
@@ -430,6 +636,87 @@ export function CrewCostsManager() {
             }}
           >
             {editingRate ? 'Update' : 'Add'} Rate
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Auto-Sync Settings Dialog */}
+      <Dialog
+        open={syncDialogOpen}
+        onClose={() => setSyncDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: '#0a0a0a',
+            border: '1px solid rgba(212, 175, 55, 0.2)',
+          },
+        }}
+      >
+        <DialogTitle sx={{ color: '#D4AF37', fontWeight: 600 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Schedule />
+            Auto-Sync Configuration
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {syncSettingsLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress sx={{ color: '#D4AF37' }} />
+            </Box>
+          ) : (
+            <>
+              <Alert severity="info" sx={{ mb: 3, bgcolor: 'rgba(33, 150, 243, 0.1)', color: '#42a5f5' }}>
+                <strong>How it works:</strong> Our AI agent reads union rate cards and industry surveys,
+                extracts crew cost data, and flags changes for your review before auto-applying.
+              </Alert>
+
+              {syncSettings && (
+                <Box sx={{ mb: 3, p: 2, bgcolor: '#1a1a1a', borderRadius: 2, border: '1px solid rgba(212, 175, 55, 0.1)' }}>
+                  <Typography variant="body2" sx={{ color: '#a0a0a0' }}>
+                    Last sync: <strong style={{ color: '#ffffff' }}>{formatDate(syncSettings.lastSyncAt)}</strong>
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#a0a0a0', mt: 0.5 }}>
+                    Next scheduled: <strong style={{ color: '#ffffff' }}>{formatDate(syncSettings.nextScheduledCheck)}</strong>
+                  </Typography>
+                </Box>
+              )}
+
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" sx={{ color: '#a0a0a0', mb: 1 }}>
+                  Sync Schedule:
+                </Typography>
+                <TextField
+                  select
+                  fullWidth
+                  value={syncSettingsForm.schedule || syncSettings?.schedule || 'quarterly'}
+                  onChange={(e) => setSyncSettingsForm({ ...syncSettingsForm, schedule: e.target.value as SyncSettingsUpdate['schedule'] })}
+                  SelectProps={{ native: true }}
+                >
+                  <option value="monthly">Monthly (1st of each month)</option>
+                  <option value="quarterly">Quarterly (Jan, Apr, Jul, Oct)</option>
+                  <option value="biannual">Semi-Annual (Jan, Jul)</option>
+                  <option value="annual">Annual (January)</option>
+                </TextField>
+              </Box>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button onClick={() => setSyncDialogOpen(false)} sx={{ color: '#a0a0a0' }}>
+            Close
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveSyncSettings}
+            disabled={syncSettingsLoading}
+            sx={{
+              bgcolor: '#D4AF37',
+              color: '#000000',
+              '&:hover': { bgcolor: '#E5C158' },
+            }}
+          >
+            Save Settings
           </Button>
         </DialogActions>
       </Dialog>

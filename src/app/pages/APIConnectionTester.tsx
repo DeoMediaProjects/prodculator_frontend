@@ -15,6 +15,7 @@ import {
 import Grid from '@mui/material/Grid';
 import { CheckCircle, Error as ErrorIcon, InfoOutlined, Launch } from '@mui/icons-material';
 import { API_CONFIG, getAPIStatus } from '@/config/api.config';
+import { apiFetch } from '@/services/api';
 
 /**
  * API Connection Tester
@@ -29,7 +30,7 @@ export function APIConnectionTester() {
   const testBackend = async () => {
     setTesting(true);
     try {
-      const response = await fetch(`${API_CONFIG.app.apiBaseURL}/api/health`);
+      const response = await apiFetch('/api/health');
       if (!response.ok) {
         return { success: false, message: `Backend health check failed (${response.status})` };
       }

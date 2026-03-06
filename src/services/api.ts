@@ -1,3 +1,5 @@
+import axios, { AxiosError, AxiosHeaders, AxiosRequestConfig } from 'axios';
+
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '');
 
 const ACCESS_TOKEN_KEY = 'prodculator_access_token';
@@ -50,12 +52,104 @@ export function clearTokens() {
   emitAuthChange(false);
 }
 
+function isDevelopmentMode(): boolean {
+  if (typeof process !== 'undefined' && process.env?.NODE_ENV) {
+    return process.env.NODE_ENV === 'development';
+  }
+  return import.meta.env.MODE === 'development';
+}
+
+const IS_DEVELOPMENT = isDevelopmentMode();
+
+function resolveRequestUrl(url?: string, baseURL?: string): string {
+  if (!url) return baseURL || API_BASE_URL;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+
+  const base = (baseURL || API_BASE_URL).replace(/\/$/, '');
+  const path = url.startsWith('/') ? url : `/${url}`;
+  return `${base}${path}`;
+}
+
+function logRequest(method: string | undefined, url: string, payload: unknown) {
+  if (!IS_DEVELOPMENT) return;
+  console.log('[API REQUEST]', {
+    method: (method || 'GET').toUpperCase(),
+    url,
+    payload,
+  });
+}
+
+function logResponse(method: string | undefined, url: string, status: number, data: unknown) {
+  if (!IS_DEVELOPMENT) return;
+  console.log('[API RESPONSE]', {
+    method: (method || 'GET').toUpperCase(),
+    url,
+    status,
+    data,
+  });
+}
+
+function logError(method: string | undefined, url: string, payload: unknown, error: unknown) {
+  if (!IS_DEVELOPMENT) return;
+  console.error('[API ERROR]', {
+    method: (method || 'GET').toUpperCase(),
+    url,
+    payload,
+    error,
+  });
+}
+
+function extractErrorDetail(payload: unknown, fallback: string): string {
+  if (typeof payload === 'string' && payload.trim()) return payload;
+  if (payload && typeof payload === 'object') {
+    const asObject = payload as { detail?: string; message?: string };
+    if (typeof asObject.detail === 'string' && asObject.detail.trim()) return asObject.detail;
+    if (typeof asObject.message === 'string' && asObject.message.trim()) return asObject.message;
+    return JSON.stringify(payload);
+  }
+  return fallback;
+}
+
+type RequestOptions = Omit<AxiosRequestConfig, 'auth'> & {
+  auth?: boolean;
+  _isRetry?: boolean; // internal — prevents infinite refresh loops
+};
+
+type InternalRequestConfig = AxiosRequestConfig & {
+  _requiresAuth?: boolean;
+  _isRetry?: boolean;
+};
+
+const axiosClient = axios.create({
+  baseURL: API_BASE_URL,
+});
+
+axiosClient.interceptors.request.use((config) => {
+  const options = config as InternalRequestConfig;
+  if (options._requiresAuth) {
+    const token = getAccessToken();
+    if (token) {
+      const headers = AxiosHeaders.from(config.headers || {});
+      headers.set('Authorization', `Bearer ${token}`);
+      config.headers = headers;
+    }
+  }
+
+  logRequest(config.method, resolveRequestUrl(config.url, config.baseURL), config.data);
+  return config;
+});
+
 // ---------------------------------------------------------------------------
 // Token refresh interceptor
 // A singleton promise ensures that if multiple requests fail with 401
 // simultaneously, only one refresh call is made; the rest wait for it.
 // ---------------------------------------------------------------------------
 let refreshPromise: Promise<boolean> | null = null;
+
+type RefreshResponse = {
+  access_token: string;
+  refresh_token: string;
+};
 
 async function attemptTokenRefresh(): Promise<boolean> {
   if (refreshPromise) return refreshPromise;
@@ -66,15 +160,16 @@ async function attemptTokenRefresh(): Promise<boolean> {
       if (!refreshToken) return false;
 
       const endpoint = isAdminSession() ? '/api/admin/auth/refresh' : '/api/auth/refresh';
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refreshToken }),
-      });
+      const response = await axiosClient.post<RefreshResponse>(
+        endpoint,
+        { refresh_token: refreshToken },
+        {
+          _requiresAuth: false,
+          _isRetry: true,
+        } as InternalRequestConfig
+      );
 
-      if (!response.ok) return false;
-
-      const data = await response.json();
+      const data = response.data;
       if (isAdminSession()) {
         setTokensSilent(data.access_token, data.refresh_token);
       } else {
@@ -91,54 +186,98 @@ async function attemptTokenRefresh(): Promise<boolean> {
   return refreshPromise;
 }
 
-// ---------------------------------------------------------------------------
-// Core request function
-// ---------------------------------------------------------------------------
-type RequestOptions = RequestInit & {
-  auth?: boolean;
-  _isRetry?: boolean; // internal — prevents infinite refresh loops
-};
+axiosClient.interceptors.response.use(
+  (response) => {
+    logResponse(response.config.method, resolveRequestUrl(response.config.url, response.config.baseURL), response.status, response.data);
+    return response;
+  },
+  async (error: AxiosError) => {
+    const originalRequest = (error.config || {}) as InternalRequestConfig;
+    const method = originalRequest.method;
+    const url = resolveRequestUrl(originalRequest.url, originalRequest.baseURL);
+
+    if (error.response?.status === 401 && originalRequest._requiresAuth && !originalRequest._isRetry) {
+      const refreshed = await attemptTokenRefresh();
+      if (refreshed) {
+        originalRequest._isRetry = true;
+        const token = getAccessToken();
+        if (token) {
+          const headers = AxiosHeaders.from(originalRequest.headers || {});
+          headers.set('Authorization', `Bearer ${token}`);
+          originalRequest.headers = headers;
+        }
+        return axiosClient.request(originalRequest);
+      }
+      clearTokens();
+    }
+
+    logError(method, url, originalRequest.data, {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message,
+    });
+
+    const detail = extractErrorDetail(
+      error.response?.data,
+      error.message || `Request failed (${error.response?.status || 'unknown'})`
+    );
+    return Promise.reject(new Error(detail));
+  }
+);
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { auth = false, _isRetry = false, headers, ...init } = options;
-  const requestHeaders = new Headers(headers || {});
-  if (auth) {
-    const token = getAccessToken();
-    if (token) {
-      requestHeaders.set('Authorization', `Bearer ${token}`);
-    }
-  }
-
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: requestHeaders,
+  const { auth = false, _isRetry = false, ...axiosOptions } = options;
+  const response = await axiosClient.request<T>({
+    url: path,
+    ...axiosOptions,
+    _requiresAuth: auth,
+    _isRetry,
   });
+  return response.data;
+}
 
-  // On 401, attempt a silent token refresh and retry the request once.
-  // The _isRetry guard prevents an infinite loop if the refresh itself fails.
-  if (response.status === 401 && auth && !_isRetry) {
-    const refreshed = await attemptTokenRefresh();
-    if (refreshed) {
-      return request<T>(path, { ...options, _isRetry: true });
+async function readFetchResponseData(response: Response): Promise<unknown> {
+  const responseClone = response.clone();
+  const contentType = responseClone.headers.get('content-type') || '';
+
+  try {
+    if (contentType.includes('application/json')) {
+      return await responseClone.json();
     }
-    // Refresh failed — the session is unrecoverable; force a logout.
-    clearTokens();
+    return await responseClone.text();
+  } catch {
+    return null;
   }
+}
 
-  const contentType = response.headers.get('content-type') || '';
-  const payload = contentType.includes('application/json')
-    ? await response.json()
-    : await response.text();
+function resolveFetchInput(input: RequestInfo | URL): RequestInfo | URL {
+  if (typeof input !== 'string') return input;
+  if (input.startsWith('http://') || input.startsWith('https://')) return input;
+  const path = input.startsWith('/') ? input : `/${input}`;
+  return `${API_BASE_URL}${path}`;
+}
 
-  if (!response.ok) {
-    const detail =
-      typeof payload === 'object' && payload !== null
-        ? (payload as { detail?: string }).detail || JSON.stringify(payload)
-        : String(payload);
-    throw new Error(detail || `Request failed (${response.status})`);
+export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const resolvedInput = resolveFetchInput(input);
+  const method = init.method || (input instanceof Request ? input.method : 'GET');
+  const url =
+    typeof resolvedInput === 'string'
+      ? resolvedInput
+      : resolvedInput instanceof URL
+        ? resolvedInput.toString()
+        : resolvedInput.url;
+
+  logRequest(method, url, init.body);
+
+  try {
+    const response = await fetch(resolvedInput, init);
+    const responseData = await readFetchResponseData(response);
+    logResponse(method, url, response.status, responseData);
+    return response;
+  } catch (error) {
+    logError(method, url, init.body, error);
+    throw error;
   }
-
-  return payload as T;
 }
 
 export const apiClient = {
@@ -149,21 +288,13 @@ export const apiClient = {
     request<T>(path, {
       ...options,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.headers || {}),
-      },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      data: body,
     }),
   patch: <T>(path: string, body?: unknown, options: RequestOptions = {}) =>
     request<T>(path, {
       ...options,
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.headers || {}),
-      },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      data: body,
     }),
   delete: <T>(path: string, options: RequestOptions = {}) =>
     request<T>(path, { ...options, method: 'DELETE' }),
@@ -171,6 +302,6 @@ export const apiClient = {
     request<T>(path, {
       ...options,
       method: 'POST',
-      body: formData,
+      data: formData,
     }),
 };

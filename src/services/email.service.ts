@@ -5,6 +5,7 @@
  */
 
 import { API_CONFIG } from '@/config/api.config';
+import { apiClient } from './api';
 
 // Email template types
 export enum EmailTemplate {
@@ -81,13 +82,6 @@ type EmailData =
  * Actual API calls should be made through backend functions or backend API
  */
 export class EmailService {
-  private apiEndpoint: string;
-
-  constructor() {
-    // This should point to your backend API endpoint or backend function
-    this.apiEndpoint = `${API_CONFIG.app.apiBaseURL}/api/emails`;
-  }
-
   /**
    * Send email through backend API
    */
@@ -98,24 +92,12 @@ export class EmailService {
     attachments?: Array<{ filename: string; content: string | Buffer; type: string }>
   ): Promise<void> {
     try {
-      const response = await fetch(this.apiEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          template,
-          to,
-          data,
-          attachments,
-        }),
+      const result = await apiClient.post('/api/emails', {
+        template,
+        to,
+        data,
+        attachments,
       });
-
-      if (!response.ok) {
-        throw new Error(`Email API error: ${response.statusText}`);
-      }
-
-      const result = await response.json();
       console.log('Email sent successfully:', result);
     } catch (error) {
       console.error('Error sending email:', error);

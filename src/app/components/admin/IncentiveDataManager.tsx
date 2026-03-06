@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -28,18 +28,18 @@ import {
 } from '@mui/material';
 import {
   Edit,
+  Delete,
   Add,
   Sync,
   Schedule,
   CheckCircle,
-  Warning,
   ExpandMore,
   ExpandLess,
   OpenInNew,
   Refresh,
 } from '@mui/icons-material';
 import { adminApi } from '@/services/admin.api';
-import type { IncentiveData, PendingChange } from '@/services/admin.types';
+import type { IncentiveData, PendingChange, SyncStatus, SyncSettings, SyncSettingsUpdate } from '@/services/admin.types';
 
 export function IncentiveDataManager(_props?: any) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -52,51 +52,72 @@ export function IncentiveDataManager(_props?: any) {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [editingIncentive, setEditingIncentive] = useState<IncentiveData | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<IncentiveData>>({});
+
+  const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [syncSettings, setSyncSettings] = useState<SyncSettings | null>(null);
+  const [syncSettingsForm, setSyncSettingsForm] = useState<SyncSettingsUpdate>({});
+  const [syncSettingsLoading, setSyncSettingsLoading] = useState(false);
+
   const didFetch = useRef(false);
 
   useEffect(() => {
     if (didFetch.current) return;
     didFetch.current = true;
     (async () => {
-      const { data, error } = await adminApi.getIncentives();
-      if (error) {
-        setFetchError(error);
+      const [incentivesRes, syncStatusRes, pendingRes] = await Promise.all([
+        adminApi.getIncentives(),
+        adminApi.getIncentiveSyncStatus(),
+        adminApi.getIncentivePendingChanges(),
+      ]);
+      if (incentivesRes.error) {
+        setFetchError(incentivesRes.error);
       } else {
-        setIncentives(data?.items ?? []);
+        setIncentives(incentivesRes.data?.items ?? []);
       }
+      if (syncStatusRes.data) setSyncStatus(syncStatusRes.data);
+      if (pendingRes.data) setPendingChanges(pendingRes.data);
       setLoading(false);
     })();
   }, []);
 
-  // Mock pending changes detected by AI
-  const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([
-    {
-      territory: 'Georgia (USA)',
-      field: 'Rate',
-      currentValue: '30%',
-      detectedValue: '30% + 10% bonus for Georgia promotional logo',
-      confidence: 'high',
-      source: 'georgia.org - Detected Jan 20, 2026',
-    },
-  ]);
-
   const handleAutoSync = async () => {
     setSyncing(true);
-    // Simulate AI-powered web scraping
-    setTimeout(() => {
-      setSyncing(false);
-      setSyncDialogOpen(false);
-      // Show success message or detected changes
-    }, 3000);
+    const { data, error } = await adminApi.triggerIncentiveSync();
+    setSyncing(false);
+    if (!error && data) {
+      // Refresh sync status and pending changes after sync
+      const [statusRes, pendingRes] = await Promise.all([
+        adminApi.getIncentiveSyncStatus(),
+        adminApi.getIncentivePendingChanges(),
+      ]);
+      if (statusRes.data) setSyncStatus(statusRes.data);
+      if (pendingRes.data) setPendingChanges(pendingRes.data);
+    }
   };
 
-  const handleApproveChange = (change: PendingChange) => {
-    // Update incentive with detected value
-    setPendingChanges(pendingChanges.filter(c => c !== change));
+  const handleApproveChange = async (change: PendingChange) => {
+    const { error } = await adminApi.approveIncentivePendingChange(change.id);
+    if (!error) {
+      setPendingChanges(pendingChanges.filter(c => c.id !== change.id));
+      // Refresh incentives since the approved change updates the underlying record
+      const { data } = await adminApi.getIncentives();
+      if (data) setIncentives(data.items);
+    }
   };
 
-  const handleRejectChange = (change: PendingChange) => {
-    setPendingChanges(pendingChanges.filter(c => c !== change));
+  const handleRejectChange = async (change: PendingChange) => {
+    const { error } = await adminApi.rejectIncentivePendingChange(change.id);
+    if (!error) {
+      setPendingChanges(pendingChanges.filter(c => c.id !== change.id));
+    }
+  };
+
+  const handleDeleteIncentive = async (id: string) => {
+    const { error } = await adminApi.deleteIncentive(id);
+    if (!error) {
+      setIncentives(incentives.filter(i => i.id !== id));
+    }
   };
 
   const handleSaveIncentive = async () => {
@@ -119,6 +140,34 @@ export function IncentiveDataManager(_props?: any) {
     setEditFormData({});
   };
 
+  const handleOpenSyncSettings = async () => {
+    setSyncDialogOpen(true);
+    setSyncSettingsLoading(true);
+    const { data } = await adminApi.getIncentiveSyncSettings();
+    if (data) {
+      setSyncSettings(data);
+      setSyncSettingsForm({ schedule: data.schedule ?? undefined, enabled: data.enabled });
+    }
+    setSyncSettingsLoading(false);
+  };
+
+  const handleSaveSyncSettings = async () => {
+    const { data, error } = await adminApi.updateIncentiveSyncSettings(syncSettingsForm);
+    if (!error && data) {
+      setSyncSettings(data);
+      setSyncDialogOpen(false);
+    }
+  };
+
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return 'N/A';
+    try {
+      return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    } catch {
+      return dateStr;
+    }
+  };
+
   return (
     <Box>
       {/* Header */}
@@ -135,7 +184,7 @@ export function IncentiveDataManager(_props?: any) {
           <Button
             variant="outlined"
             startIcon={<Schedule />}
-            onClick={() => setSyncDialogOpen(true)}
+            onClick={handleOpenSyncSettings}
             sx={{
               borderColor: '#D4AF37',
               color: '#D4AF37',
@@ -185,7 +234,7 @@ export function IncentiveDataManager(_props?: any) {
                   AI-Powered Auto-Sync Status
                 </Typography>
                 <Typography variant="body2" sx={{ color: '#a0a0a0' }}>
-                  Next scheduled check: <strong>April 1, 2026</strong> (Quarterly)
+                  Next scheduled check: <strong>{formatDate(syncStatus?.nextScheduledCheck)}</strong>
                 </Typography>
               </Box>
             </Box>
@@ -208,7 +257,7 @@ export function IncentiveDataManager(_props?: any) {
             <Grid size={{ xs: 12, md: 4 }}>
               <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'rgba(46, 125, 50, 0.1)', borderRadius: 2 }}>
                 <Typography variant="h4" sx={{ color: '#66bb6a', fontWeight: 700 }}>
-                  30
+                  {syncStatus?.territoriesSyncing ?? '—'}
                 </Typography>
                 <Typography variant="body2" sx={{ color: '#a0a0a0' }}>
                   Territories Auto-Syncing
@@ -228,7 +277,7 @@ export function IncentiveDataManager(_props?: any) {
             <Grid size={{ xs: 12, md: 4 }}>
               <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'rgba(212, 175, 55, 0.1)', borderRadius: 2 }}>
                 <Typography variant="h4" sx={{ color: '#D4AF37', fontWeight: 700 }}>
-                  23
+                  {syncStatus?.daysSinceLastCheck ?? '—'}
                 </Typography>
                 <Typography variant="body2" sx={{ color: '#a0a0a0' }}>
                   Days Since Last Check
@@ -238,34 +287,6 @@ export function IncentiveDataManager(_props?: any) {
           </Grid>
         </CardContent>
       </Card>
-
-      {/* South Africa Payment Issues Warning */}
-      <Alert
-        severity="error"
-        icon={<Warning />}
-        sx={{
-          mb: 3,
-          bgcolor: 'rgba(244, 67, 54, 0.1)',
-          border: '2px solid rgba(244, 67, 54, 0.4)',
-          color: '#ffffff',
-          '& .MuiAlert-icon': {
-            color: '#f44336',
-          },
-        }}
-      >
-        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-          South Africa Incentive - Active with Payment Issues
-        </Typography>
-        <Typography variant="body2" sx={{ color: '#a0a0a0', mb: 1 }}>
-          The South African Foreign Film & TV Production Incentive (20-35%) is <strong>legally active and available</strong>, however, 
-          there are <strong>documented delays and issues with rebate payments</strong> to international productions. 
-        </Typography>
-        <Typography variant="body2" sx={{ color: '#a0a0a0' }}>
-          <strong>Recommendation:</strong> While South Africa remains excellent for assessment purposes (low crew costs, strong infrastructure, favorable currency), 
-          producers should exercise extreme caution regarding rebate reliance. Consider structuring deals with contingency plans 
-          or verifying current payout status with recent productions before committing to South African incentive programs.
-        </Typography>
-      </Alert>
 
       {/* Pending Changes Alert */}
       {pendingChanges.length > 0 && (
@@ -302,7 +323,7 @@ export function IncentiveDataManager(_props?: any) {
           </Box>
           {pendingChanges.map((change, index) => (
             <Box
-              key={index}
+              key={change.id}
               sx={{
                 p: 3,
                 borderBottom: index < pendingChanges.length - 1 ? '1px solid rgba(255, 152, 0, 0.1)' : 'none',
@@ -319,7 +340,7 @@ export function IncentiveDataManager(_props?: any) {
                         Current Value:
                       </Typography>
                       <Typography variant="body2" sx={{ color: '#f44336', fontWeight: 600 }}>
-                        {change.currentValue}
+                        {change.currentValue ?? 'N/A'}
                       </Typography>
                     </Grid>
                     <Grid size={{ xs: 12, md: 2 }} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -405,40 +426,28 @@ export function IncentiveDataManager(_props?: any) {
             <TableBody>
               {incentives.flatMap((incentive, index) => {
                 // Check if we need a country divider
-                const showDivider = index > 0 && (() => {
-                  const currentCountry = 
-                    incentive.territory.includes('(UK)') || incentive.territory === 'United Kingdom (National)' || 
-                    incentive.territory === 'England' || incentive.territory === 'Scotland' || 
-                    incentive.territory === 'Wales' || incentive.territory === 'Northern Ireland' ? 'UK' :
-                    incentive.territory.includes('(USA)') ? 'USA' :
-                    incentive.territory.includes('(SA)') || incentive.territory === 'South Africa (National)' ? 'South Africa' :
-                    incentive.territory === 'Malta' ? 'Malta' :
-                    ['British Columbia', 'Ontario', 'Quebec', 'Alberta', 'Manitoba', 'Nova Scotia'].includes(incentive.territory) ? 'Canada' : '';
-                  
-                  const previousIncentive = incentives[index - 1];
-                  const previousCountry = 
-                    previousIncentive.territory.includes('(UK)') || previousIncentive.territory === 'United Kingdom (National)' || 
-                    previousIncentive.territory === 'England' || previousIncentive.territory === 'Scotland' || 
-                    previousIncentive.territory === 'Wales' || previousIncentive.territory === 'Northern Ireland' ? 'UK' :
-                    previousIncentive.territory.includes('(USA)') ? 'USA' :
-                    previousIncentive.territory.includes('(SA)') || previousIncentive.territory === 'South Africa (National)' ? 'South Africa' :
-                    previousIncentive.territory === 'Malta' ? 'Malta' :
-                    ['British Columbia', 'Ontario', 'Quebec', 'Alberta', 'Manitoba', 'Nova Scotia'].includes(previousIncentive.territory) ? 'Canada' : '';
-                  
-                  return currentCountry !== previousCountry;
-                })();
+                const getCountryGroup = (t: string) =>
+                  t.includes('(UK)') || t === 'United Kingdom (National)' ||
+                  t === 'England' || t === 'Scotland' ||
+                  t === 'Wales' || t === 'Northern Ireland' ? 'UK' :
+                  t.includes('(USA)') ? 'USA' :
+                  t.includes('(SA)') || t === 'South Africa (National)' ? 'South Africa' :
+                  t === 'Malta' ? 'Malta' :
+                  ['British Columbia', 'Ontario', 'Quebec', 'Alberta', 'Manitoba', 'Nova Scotia'].includes(t) ? 'Canada' : '';
 
-                const country = 
-                  incentive.territory.includes('(UK)') || incentive.territory === 'United Kingdom (National)' || 
-                  incentive.territory === 'England' || incentive.territory === 'Scotland' || 
-                  incentive.territory === 'Wales' || incentive.territory === 'Northern Ireland' ? '🇬🇧 United Kingdom' :
-                  incentive.territory.includes('(USA)') ? '🇺🇸 United States' :
-                  incentive.territory.includes('(SA)') || incentive.territory === 'South Africa (National)' ? '🇿🇦 South Africa' :
-                  incentive.territory === 'Malta' ? '🇲🇹 Malta' :
-                  ['British Columbia', 'Ontario', 'Quebec', 'Alberta', 'Manitoba', 'Nova Scotia'].includes(incentive.territory) ? '🇨🇦 Canada' : '';
+                const showDivider = index > 0 && getCountryGroup(incentive.territory) !== getCountryGroup(incentives[index - 1].territory);
+
+                const countryLabels: Record<string, string> = {
+                  'UK': '🇬🇧 United Kingdom',
+                  'USA': '🇺🇸 United States',
+                  'South Africa': '🇿🇦 South Africa',
+                  'Malta': '🇲🇹 Malta',
+                  'Canada': '🇨🇦 Canada',
+                };
+                const country = countryLabels[getCountryGroup(incentive.territory)] || '';
 
                 const rows = [];
-                
+
                 if (showDivider) {
                   rows.push(
                     <TableRow key={`divider-${incentive.territory}-${index}`}>
@@ -467,7 +476,7 @@ export function IncentiveDataManager(_props?: any) {
                     </TableRow>
                   );
                 }
-                
+
                 rows.push(
                   <TableRow key={`${incentive.territory}-${incentive.program}-${index}`} sx={{ '&:hover': { bgcolor: 'rgba(212, 175, 55, 0.05)' } }}>
                     <TableCell sx={{ color: '#ffffff' }}>{incentive.territory}</TableCell>
@@ -506,50 +515,62 @@ export function IncentiveDataManager(_props?: any) {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Link
-                        href={incentive.sourceUrl}
-                        target="_blank"
-                        rel="noopener"
-                        sx={{
-                          color: '#D4AF37',
-                          textDecoration: 'none',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 0.5,
-                          fontSize: '0.875rem',
-                          '&:hover': { color: '#E5C158' },
-                        }}
-                      >
-                        Official Source
-                        <OpenInNew sx={{ fontSize: 14 }} />
-                      </Link>
+                      {incentive.sourceUrl ? (
+                        <Link
+                          href={incentive.sourceUrl ?? undefined}
+                          target="_blank"
+                          rel="noopener"
+                          sx={{
+                            color: '#D4AF37',
+                            textDecoration: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.5,
+                            fontSize: '0.875rem',
+                            '&:hover': { color: '#E5C158' },
+                          }}
+                        >
+                          Official Source
+                          <OpenInNew sx={{ fontSize: 14 }} />
+                        </Link>
+                      ) : (
+                        <Typography variant="body2" sx={{ color: '#666' }}>—</Typography>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Chip
                         label={incentive.status}
                         size="small"
                         sx={{
-                          bgcolor: incentive.status === 'Active' ? 'rgba(46, 125, 50, 0.2)' : 'rgba(255, 152, 0, 0.2)',
-                          color: incentive.status === 'Active' ? '#66bb6a' : '#ffa726',
+                          bgcolor: incentive.status?.toLowerCase() === 'active' ? 'rgba(46, 125, 50, 0.2)' : 'rgba(255, 152, 0, 0.2)',
+                          color: incentive.status?.toLowerCase() === 'active' ? '#66bb6a' : '#ffa726',
                           fontWeight: 600,
                         }}
                       />
                     </TableCell>
                     <TableCell>
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          setEditingIncentive(incentive);
-                          setEditFormData(incentive);
-                          setEditDialogOpen(true);
-                        }}
-                      >
-                        <Edit sx={{ color: '#D4AF37', fontSize: 18 }} />
-                      </IconButton>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setEditingIncentive(incentive);
+                            setEditFormData(incentive);
+                            setEditDialogOpen(true);
+                          }}
+                        >
+                          <Edit sx={{ color: '#D4AF37', fontSize: 18 }} />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={() => incentive.id && handleDeleteIncentive(incentive.id)}
+                        >
+                          <Delete sx={{ color: '#f44336', fontSize: 18 }} />
+                        </IconButton>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 );
-                
+
                 return rows;
               })}
             </TableBody>
@@ -577,59 +598,81 @@ export function IncentiveDataManager(_props?: any) {
           </Box>
         </DialogTitle>
         <DialogContent>
-          <Alert severity="info" sx={{ mb: 3, bgcolor: 'rgba(33, 150, 243, 0.1)', color: '#42a5f5' }}>
-            <strong>How it works:</strong> Our AI agent reads official government websites and PDFs quarterly,
-            extracts tax incentive data, and flags changes for your review before auto-applying.
-          </Alert>
+          {syncSettingsLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress sx={{ color: '#D4AF37' }} />
+            </Box>
+          ) : (
+            <>
+              <Alert severity="info" sx={{ mb: 3, bgcolor: 'rgba(33, 150, 243, 0.1)', color: '#42a5f5' }}>
+                <strong>How it works:</strong> Our AI agent reads official government websites and PDFs quarterly,
+                extracts tax incentive data, and flags changes for your review before auto-applying.
+              </Alert>
 
-          <Typography variant="subtitle1" sx={{ color: '#D4AF37', fontWeight: 600, mb: 2 }}>
-            Monitored Official Sources:
-          </Typography>
-
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {incentives.filter(i => i.autoSyncEnabled).map((incentive, index) => (
-              <Card key={index} sx={{ bgcolor: '#1a1a1a', border: '1px solid rgba(212, 175, 55, 0.1)' }}>
-                <CardContent>
-                  <Typography variant="subtitle2" sx={{ color: '#ffffff', fontWeight: 600, mb: 1 }}>
-                    {incentive.territory}
+              {syncSettings && (
+                <Box sx={{ mb: 3, p: 2, bgcolor: '#1a1a1a', borderRadius: 2, border: '1px solid rgba(212, 175, 55, 0.1)' }}>
+                  <Typography variant="body2" sx={{ color: '#a0a0a0' }}>
+                    Last sync: <strong style={{ color: '#ffffff' }}>{formatDate(syncSettings.lastSyncAt)}</strong>
                   </Typography>
-                  <Link
-                    href={incentive.sourceUrl}
-                    target="_blank"
-                    sx={{
-                      color: '#D4AF37',
-                      fontSize: '0.875rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.5,
-                      textDecoration: 'none',
-                      '&:hover': { color: '#E5C158' },
-                    }}
-                  >
-                    {incentive.sourceUrl}
-                    <OpenInNew sx={{ fontSize: 12 }} />
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
-          </Box>
+                  <Typography variant="body2" sx={{ color: '#a0a0a0', mt: 0.5 }}>
+                    Next scheduled: <strong style={{ color: '#ffffff' }}>{formatDate(syncSettings.nextScheduledCheck)}</strong>
+                  </Typography>
+                </Box>
+              )}
 
-          <Box sx={{ mt: 3 }}>
-            <Typography variant="subtitle2" sx={{ color: '#a0a0a0', mb: 1 }}>
-              Sync Schedule:
-            </Typography>
-            <TextField
-              select
-              fullWidth
-              defaultValue="quarterly"
-              SelectProps={{ native: true }}
-            >
-              <option value="monthly">Monthly (1st of each month)</option>
-              <option value="quarterly">Quarterly (Jan, Apr, Jul, Oct)</option>
-              <option value="semiannual">Semi-Annual (Jan, Jul)</option>
-              <option value="annual">Annual (January)</option>
-            </TextField>
-          </Box>
+              <Typography variant="subtitle1" sx={{ color: '#D4AF37', fontWeight: 600, mb: 2 }}>
+                Monitored Official Sources:
+              </Typography>
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {incentives.filter(i => i.autoSyncEnabled).map((incentive, index) => (
+                  <Card key={index} sx={{ bgcolor: '#1a1a1a', border: '1px solid rgba(212, 175, 55, 0.1)' }}>
+                    <CardContent>
+                      <Typography variant="subtitle2" sx={{ color: '#ffffff', fontWeight: 600, mb: 1 }}>
+                        {incentive.territory}
+                      </Typography>
+                      {incentive.sourceUrl && (
+                        <Link
+                          href={incentive.sourceUrl ?? undefined}
+                          target="_blank"
+                          sx={{
+                            color: '#D4AF37',
+                            fontSize: '0.875rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.5,
+                            textDecoration: 'none',
+                            '&:hover': { color: '#E5C158' },
+                          }}
+                        >
+                          {incentive.sourceUrl}
+                          <OpenInNew sx={{ fontSize: 12 }} />
+                        </Link>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </Box>
+
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="subtitle2" sx={{ color: '#a0a0a0', mb: 1 }}>
+                  Sync Schedule:
+                </Typography>
+                <TextField
+                  select
+                  fullWidth
+                  value={syncSettingsForm.schedule || syncSettings?.schedule || 'quarterly'}
+                  onChange={(e) => setSyncSettingsForm({ ...syncSettingsForm, schedule: e.target.value as SyncSettingsUpdate['schedule'] })}
+                  SelectProps={{ native: true }}
+                >
+                  <option value="monthly">Monthly (1st of each month)</option>
+                  <option value="quarterly">Quarterly (Jan, Apr, Jul, Oct)</option>
+                  <option value="biannual">Semi-Annual (Jan, Jul)</option>
+                  <option value="annual">Annual (January)</option>
+                </TextField>
+              </Box>
+            </>
+          )}
         </DialogContent>
         <DialogActions sx={{ p: 3, pt: 0 }}>
           <Button onClick={() => setSyncDialogOpen(false)} sx={{ color: '#a0a0a0' }}>
@@ -637,6 +680,8 @@ export function IncentiveDataManager(_props?: any) {
           </Button>
           <Button
             variant="contained"
+            onClick={handleSaveSyncSettings}
+            disabled={syncSettingsLoading}
             sx={{
               bgcolor: '#D4AF37',
               color: '#000000',
