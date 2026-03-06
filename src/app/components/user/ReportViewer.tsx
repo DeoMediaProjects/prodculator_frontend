@@ -38,7 +38,8 @@ import {
   Lock,
 } from '@mui/icons-material';
 import { useScript } from '@/app/contexts/ScriptContext';
-import { generateReportPDF } from '@/services/report-pdf.service';
+import { generateReportPDF, downloadReportPDF, viewReportPDF } from '@/services/report-pdf.service';
+import { apiClient } from '@/services/api';
 import exampleLogo from '@/assets/2ac5b205356b38916f5ff32008dfa103d8ffc2cb.png';
 
 function TabPanel({ children, value, index }: { children: React.ReactNode; value: number; index: number }) {
@@ -48,24 +49,56 @@ function TabPanel({ children, value, index }: { children: React.ReactNode; value
 export function ReportViewer() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { reportId } = useParams<{ reportId: string }>();
   const { analysis } = useScript();
   const [tabValue, setTabValue] = useState(0);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-  
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
   const isPreview = location.pathname.includes('preview');
 
   useEffect(() => {
-    // Scroll to top on mount
     window.scrollTo(0, 0);
   }, []);
 
+  useEffect(() => {
+    if (!reportId) return;
+    apiClient.get<{ pdf_url?: string; pdfUrl?: string }>(`/api/reports/${reportId}`, { auth: true })
+      .then((report) => setPdfUrl(report.pdf_url || report.pdfUrl || null))
+      .catch(() => { /* pdfUrl stays null — fallback to print */ });
+  }, [reportId]);
+
+  const handleDownloadPDF = async () => {
+    if (!reportId) return;
+    setIsDownloading(true);
+    try {
+      await downloadReportPDF(reportId, analysis?.scriptTitle);
+    } catch (error) {
+      console.error('PDF download failed:', error);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleViewPDF = async () => {
+    if (!reportId) return;
+    setIsDownloading(true);
+    try {
+      await viewReportPDF(reportId);
+    } catch (error) {
+      console.error('PDF view failed:', error);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const handleExportPDF = async () => {
     if (!analysis) return;
-    
+
     setIsGeneratingPDF(true);
     try {
       await generateReportPDF(analysis);
-      // Success - PDF downloaded automatically
     } catch (error) {
       console.error('PDF generation error:', error);
       alert('Failed to generate PDF. Please try again.');
@@ -160,11 +193,33 @@ export function ReportViewer() {
                   Upgrade to Full
                 </Button>
               )}
-              {!isPreview && (
-                <Button 
-                  variant="outlined" 
-                  startIcon={isGeneratingPDF ? <CircularProgress size={16} /> : <Download />} 
-                  sx={{ color: '#000', borderColor: '#000' }} 
+              {!isPreview && pdfUrl && (
+                <>
+                  <Button
+                    variant="outlined"
+                    startIcon={isDownloading ? <CircularProgress size={16} /> : <Download />}
+                    sx={{ color: '#000', borderColor: '#000' }}
+                    onClick={handleViewPDF}
+                    disabled={isDownloading}
+                  >
+                    View PDF
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={isDownloading ? <CircularProgress size={16} sx={{ color: '#000' }} /> : <Download />}
+                    sx={{ bgcolor: '#000', color: '#fff', '&:hover': { bgcolor: '#222' } }}
+                    onClick={handleDownloadPDF}
+                    disabled={isDownloading}
+                  >
+                    {isDownloading ? 'Downloading...' : 'Download PDF'}
+                  </Button>
+                </>
+              )}
+              {!isPreview && !pdfUrl && (
+                <Button
+                  variant="outlined"
+                  startIcon={isGeneratingPDF ? <CircularProgress size={16} /> : <Download />}
+                  sx={{ color: '#000', borderColor: '#000' }}
                   onClick={handleExportPDF}
                   disabled={isGeneratingPDF}
                 >
