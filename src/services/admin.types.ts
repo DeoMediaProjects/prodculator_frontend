@@ -23,20 +23,27 @@ export interface IncentiveData {
   program: string;
   rate: string;
   cap: string;
-  lastUpdated: string;
-  status: 'Active' | 'Assessment Only';
-  sourceUrl: string;
+  lastUpdated: string | null;
+  status: string;
+  sourceUrl: string | null;
   autoSyncEnabled: boolean;
-  lastAutoCheck?: string;
+  lastAutoCheck?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
 export interface PendingChange {
+  id: string;
   territory: string;
   field: string;
-  currentValue: string;
+  currentValue: string | null;
   detectedValue: string;
   confidence: 'high' | 'medium' | 'low';
-  source: string;
+  source: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string | null;
+  resourceId: string | null;
+  resolvedAt: string | null;
 }
 
 // ── Crew Costs ────────────────────────────────────────────────────────────────
@@ -48,8 +55,35 @@ export interface CrewRate {
   dayRate: number;
   weekRate: number;
   union: string;
-  lastUpdated: string;
-  source: string;
+  lastUpdated: string | null;
+  source: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+// ── Sync System (shared by incentives & crew costs) ──────────────────────────
+export interface SyncStatus {
+  territoriesSyncing: number;
+  pendingChanges: number;
+  daysSinceLastCheck: number;
+  nextScheduledCheck: string | null;
+}
+
+export interface SyncSettings {
+  schedule: 'monthly' | 'quarterly' | 'biannual' | 'annual' | null;
+  enabled: boolean;
+  lastSyncAt: string | null;
+  nextScheduledCheck: string | null;
+}
+
+export interface SyncSettingsUpdate {
+  schedule?: 'monthly' | 'quarterly' | 'biannual' | 'annual';
+  enabled?: boolean;
+}
+
+export interface SyncTriggerResponse {
+  status: 'sync_triggered';
+  lastSyncAt: string;
 }
 
 // ── Comparable Productions ────────────────────────────────────────────────────

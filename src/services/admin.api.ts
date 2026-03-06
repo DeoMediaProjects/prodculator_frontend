@@ -9,9 +9,33 @@ import {
   adminComparableUrl,
   ADMIN_GRANTS_URL,
   ADMIN_GRANTS_BULK_IMPORT_URL,
+  ADMIN_GRANTS_SYNC_URL,
+  ADMIN_GRANTS_SYNC_STATUS_URL,
+  ADMIN_GRANTS_PENDING_CHANGES_URL,
+  adminGrantPendingChangeApproveUrl,
+  adminGrantPendingChangeRejectUrl,
+  ADMIN_GRANTS_SYNC_SETTINGS_URL,
   adminGrantUrl,
   ADMIN_FESTIVALS_URL,
+  ADMIN_FESTIVALS_SYNC_URL,
+  ADMIN_FESTIVALS_SYNC_STATUS_URL,
+  ADMIN_FESTIVALS_PENDING_CHANGES_URL,
+  adminFestivalPendingChangeApproveUrl,
+  adminFestivalPendingChangeRejectUrl,
+  ADMIN_FESTIVALS_SYNC_SETTINGS_URL,
   adminFestivalUrl,
+  ADMIN_INCENTIVES_SYNC_STATUS_URL,
+  ADMIN_INCENTIVES_PENDING_CHANGES_URL,
+  adminIncentivePendingChangeApproveUrl,
+  adminIncentivePendingChangeRejectUrl,
+  ADMIN_INCENTIVES_SYNC_URL,
+  ADMIN_INCENTIVES_SYNC_SETTINGS_URL,
+  ADMIN_CREW_COSTS_SYNC_STATUS_URL,
+  ADMIN_CREW_COSTS_PENDING_CHANGES_URL,
+  adminCrewCostPendingChangeApproveUrl,
+  adminCrewCostPendingChangeRejectUrl,
+  ADMIN_CREW_COSTS_SYNC_URL,
+  ADMIN_CREW_COSTS_SYNC_SETTINGS_URL,
 } from './admin.apiurl';
 import type {
   AdminMetrics,
@@ -22,6 +46,11 @@ import type {
   CreateGrantPayload,
   BulkImportResult,
   PaginatedResponse,
+  SyncStatus,
+  PendingChange,
+  SyncSettings,
+  SyncSettingsUpdate,
+  SyncTriggerResponse,
 } from './admin.types';
 import type { Festival } from '@/app/types/festival';
 
@@ -122,6 +151,134 @@ async function deleteCrewRate(id: string): ApiResult<void> {
   }
 }
 
+// ── Incentive Sync ───────────────────────────────────────────────────────────
+async function getIncentiveSyncStatus(signal?: AbortSignal): ApiResult<SyncStatus> {
+  try {
+    const data = await apiClient.get<SyncStatus>(ADMIN_INCENTIVES_SYNC_STATUS_URL, { auth: true, signal });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch incentive sync status' };
+  }
+}
+
+async function getIncentivePendingChanges(signal?: AbortSignal): ApiResult<PendingChange[]> {
+  try {
+    const data = await apiClient.get<PendingChange[]>(ADMIN_INCENTIVES_PENDING_CHANGES_URL, { auth: true, signal });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch incentive pending changes' };
+  }
+}
+
+async function approveIncentivePendingChange(changeId: string): ApiResult<PendingChange> {
+  try {
+    const data = await apiClient.post<PendingChange>(adminIncentivePendingChangeApproveUrl(changeId), {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to approve pending change' };
+  }
+}
+
+async function rejectIncentivePendingChange(changeId: string): ApiResult<PendingChange> {
+  try {
+    const data = await apiClient.post<PendingChange>(adminIncentivePendingChangeRejectUrl(changeId), {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to reject pending change' };
+  }
+}
+
+async function triggerIncentiveSync(): ApiResult<SyncTriggerResponse> {
+  try {
+    const data = await apiClient.post<SyncTriggerResponse>(ADMIN_INCENTIVES_SYNC_URL, {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to trigger incentive sync' };
+  }
+}
+
+async function getIncentiveSyncSettings(signal?: AbortSignal): ApiResult<SyncSettings> {
+  try {
+    const data = await apiClient.get<SyncSettings>(ADMIN_INCENTIVES_SYNC_SETTINGS_URL, { auth: true, signal });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch incentive sync settings' };
+  }
+}
+
+async function updateIncentiveSyncSettings(payload: SyncSettingsUpdate): ApiResult<SyncSettings> {
+  try {
+    const data = await apiClient.patch<SyncSettings>(ADMIN_INCENTIVES_SYNC_SETTINGS_URL, payload, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to update incentive sync settings' };
+  }
+}
+
+// ── Crew Cost Sync ───────────────────────────────────────────────────────────
+async function getCrewCostSyncStatus(signal?: AbortSignal): ApiResult<SyncStatus> {
+  try {
+    const data = await apiClient.get<SyncStatus>(ADMIN_CREW_COSTS_SYNC_STATUS_URL, { auth: true, signal });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch crew cost sync status' };
+  }
+}
+
+async function getCrewCostPendingChanges(signal?: AbortSignal): ApiResult<PendingChange[]> {
+  try {
+    const data = await apiClient.get<PendingChange[]>(ADMIN_CREW_COSTS_PENDING_CHANGES_URL, { auth: true, signal });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch crew cost pending changes' };
+  }
+}
+
+async function approveCrewCostPendingChange(changeId: string): ApiResult<PendingChange> {
+  try {
+    const data = await apiClient.post<PendingChange>(adminCrewCostPendingChangeApproveUrl(changeId), {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to approve pending change' };
+  }
+}
+
+async function rejectCrewCostPendingChange(changeId: string): ApiResult<PendingChange> {
+  try {
+    const data = await apiClient.post<PendingChange>(adminCrewCostPendingChangeRejectUrl(changeId), {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to reject pending change' };
+  }
+}
+
+async function triggerCrewCostSync(): ApiResult<SyncTriggerResponse> {
+  try {
+    const data = await apiClient.post<SyncTriggerResponse>(ADMIN_CREW_COSTS_SYNC_URL, {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to trigger crew cost sync' };
+  }
+}
+
+async function getCrewCostSyncSettings(signal?: AbortSignal): ApiResult<SyncSettings> {
+  try {
+    const data = await apiClient.get<SyncSettings>(ADMIN_CREW_COSTS_SYNC_SETTINGS_URL, { auth: true, signal });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch crew cost sync settings' };
+  }
+}
+
+async function updateCrewCostSyncSettings(payload: SyncSettingsUpdate): ApiResult<SyncSettings> {
+  try {
+    const data = await apiClient.patch<SyncSettings>(ADMIN_CREW_COSTS_SYNC_SETTINGS_URL, payload, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to update crew cost sync settings' };
+  }
+}
+
 // ── Comparables ───────────────────────────────────────────────────────────────
 async function getComparables(limit = 50, offset = 0, signal?: AbortSignal): ApiResult<PaginatedResponse<ComparableProduction>> {
   try {
@@ -213,6 +370,69 @@ async function deleteGrant(id: string): ApiResult<void> {
   }
 }
 
+async function triggerGrantSync(): ApiResult<SyncTriggerResponse> {
+  try {
+    const data = await apiClient.post<SyncTriggerResponse>(ADMIN_GRANTS_SYNC_URL, {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to trigger grants sync' };
+  }
+}
+
+async function getGrantSyncStatus(signal?: AbortSignal): ApiResult<SyncStatus> {
+  try {
+    const data = await apiClient.get<SyncStatus>(ADMIN_GRANTS_SYNC_STATUS_URL, { auth: true, signal });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch grants sync status' };
+  }
+}
+
+async function getGrantPendingChanges(signal?: AbortSignal): ApiResult<PendingChange[]> {
+  try {
+    const data = await apiClient.get<PendingChange[]>(ADMIN_GRANTS_PENDING_CHANGES_URL, { auth: true, signal });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch grants pending changes' };
+  }
+}
+
+async function approveGrantPendingChange(changeId: string): ApiResult<PendingChange> {
+  try {
+    const data = await apiClient.post<PendingChange>(adminGrantPendingChangeApproveUrl(changeId), {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to approve grant pending change' };
+  }
+}
+
+async function rejectGrantPendingChange(changeId: string): ApiResult<PendingChange> {
+  try {
+    const data = await apiClient.post<PendingChange>(adminGrantPendingChangeRejectUrl(changeId), {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to reject grant pending change' };
+  }
+}
+
+async function getGrantSyncSettings(signal?: AbortSignal): ApiResult<SyncSettings> {
+  try {
+    const data = await apiClient.get<SyncSettings>(ADMIN_GRANTS_SYNC_SETTINGS_URL, { auth: true, signal });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch grants sync settings' };
+  }
+}
+
+async function updateGrantSyncSettings(payload: SyncSettingsUpdate): ApiResult<SyncSettings> {
+  try {
+    const data = await apiClient.patch<SyncSettings>(ADMIN_GRANTS_SYNC_SETTINGS_URL, payload, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to update grants sync settings' };
+  }
+}
+
 // ── Festivals ─────────────────────────────────────────────────────────────────
 async function getFestivals(limit = 50, offset = 0, signal?: AbortSignal): ApiResult<PaginatedResponse<Festival>> {
   try {
@@ -253,6 +473,69 @@ async function deleteFestival(id: string): ApiResult<void> {
   }
 }
 
+async function triggerFestivalSync(): ApiResult<SyncTriggerResponse> {
+  try {
+    const data = await apiClient.post<SyncTriggerResponse>(ADMIN_FESTIVALS_SYNC_URL, {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to trigger festival sync' };
+  }
+}
+
+async function getFestivalSyncStatus(signal?: AbortSignal): ApiResult<SyncStatus> {
+  try {
+    const data = await apiClient.get<SyncStatus>(ADMIN_FESTIVALS_SYNC_STATUS_URL, { auth: true, signal });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch festival sync status' };
+  }
+}
+
+async function getFestivalPendingChanges(signal?: AbortSignal): ApiResult<PendingChange[]> {
+  try {
+    const data = await apiClient.get<PendingChange[]>(ADMIN_FESTIVALS_PENDING_CHANGES_URL, { auth: true, signal });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch festival pending changes' };
+  }
+}
+
+async function approveFestivalPendingChange(changeId: string): ApiResult<PendingChange> {
+  try {
+    const data = await apiClient.post<PendingChange>(adminFestivalPendingChangeApproveUrl(changeId), {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to approve festival pending change' };
+  }
+}
+
+async function rejectFestivalPendingChange(changeId: string): ApiResult<PendingChange> {
+  try {
+    const data = await apiClient.post<PendingChange>(adminFestivalPendingChangeRejectUrl(changeId), {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to reject festival pending change' };
+  }
+}
+
+async function getFestivalSyncSettings(signal?: AbortSignal): ApiResult<SyncSettings> {
+  try {
+    const data = await apiClient.get<SyncSettings>(ADMIN_FESTIVALS_SYNC_SETTINGS_URL, { auth: true, signal });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch festival sync settings' };
+  }
+}
+
+async function updateFestivalSyncSettings(payload: SyncSettingsUpdate): ApiResult<SyncSettings> {
+  try {
+    const data = await apiClient.patch<SyncSettings>(ADMIN_FESTIVALS_SYNC_SETTINGS_URL, payload, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to update festival sync settings' };
+  }
+}
+
 // ── Named export ──────────────────────────────────────────────────────────────
 export const adminApi = {
   getMetrics,
@@ -260,10 +543,24 @@ export const adminApi = {
   createIncentive,
   updateIncentive,
   deleteIncentive,
+  getIncentiveSyncStatus,
+  getIncentivePendingChanges,
+  approveIncentivePendingChange,
+  rejectIncentivePendingChange,
+  triggerIncentiveSync,
+  getIncentiveSyncSettings,
+  updateIncentiveSyncSettings,
   getCrewRates,
   createCrewRate,
   updateCrewRate,
   deleteCrewRate,
+  getCrewCostSyncStatus,
+  getCrewCostPendingChanges,
+  approveCrewCostPendingChange,
+  rejectCrewCostPendingChange,
+  triggerCrewCostSync,
+  getCrewCostSyncSettings,
+  updateCrewCostSyncSettings,
   getComparables,
   createComparable,
   updateComparable,
@@ -273,8 +570,22 @@ export const adminApi = {
   updateGrant,
   deleteGrant,
   bulkImportGrants,
+  triggerGrantSync,
+  getGrantSyncStatus,
+  getGrantPendingChanges,
+  approveGrantPendingChange,
+  rejectGrantPendingChange,
+  getGrantSyncSettings,
+  updateGrantSyncSettings,
   getFestivals,
   createFestival,
   updateFestival,
   deleteFestival,
+  triggerFestivalSync,
+  getFestivalSyncStatus,
+  getFestivalPendingChanges,
+  approveFestivalPendingChange,
+  rejectFestivalPendingChange,
+  getFestivalSyncSettings,
+  updateFestivalSyncSettings,
 };

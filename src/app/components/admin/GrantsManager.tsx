@@ -31,6 +31,7 @@ import {
   Switch,
   FormControlLabel,
   CircularProgress,
+  Collapse,
 } from '@mui/material';
 import {
   Add,
@@ -39,15 +40,26 @@ import {
   Visibility,
   CheckCircle,
   Warning,
+  Sync,
   Schedule,
   Event,
   Upload,
   Download,
   Refresh,
+  ExpandMore,
+  ExpandLess,
   MonetizationOn,
 } from '@mui/icons-material';
 import { adminApi } from '@/services/admin.api';
-import type { Grant, CreateGrantPayload, BulkImportResult } from '@/services/admin.types';
+import type {
+  Grant,
+  CreateGrantPayload,
+  BulkImportResult,
+  PendingChange,
+  SyncStatus,
+  SyncSettings,
+  SyncSettingsUpdate,
+} from '@/services/admin.types';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -86,9 +98,15 @@ function normalizeGrant(raw: any): Grant {
     ? raw.eligibility.split(';').map((s: string) => s.trim()).filter(Boolean)
     : [];
 
+  const rawSource = typeof raw.dataSource === 'string' ? raw.dataSource : 'manual';
+  const dataSource: Grant['dataSource'] = ['manual', 'rss', 'api', 'scrape'].includes(rawSource)
+    ? rawSource as Grant['dataSource']
+    : 'manual';
+
   return {
     ...raw,
     status,
+    dataSource,
     eligibility,
     daysUntilDeadline: typeof raw.daysUntilDeadline === 'number' ? raw.daysUntilDeadline : daysUntil,
   };
@@ -99,12 +117,52 @@ export function GrantsManager() {
   const [grants, setGrants] = useState<Grant[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [showPendingChanges, setShowPendingChanges] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncSuccessMessage, setSyncSuccessMessage] = useState<string | null>(null);
+  const [syncErrorMessage, setSyncErrorMessage] = useState<string | null>(null);
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+  const [syncSettings, setSyncSettings] = useState<SyncSettings | null>(null);
+  const [syncSettingsForm, setSyncSettingsForm] = useState<SyncSettingsUpdate>({});
+  const [syncSettingsLoading, setSyncSettingsLoading] = useState(false);
   const didFetch = useRef(false);
 
   useEffect(() => {
     if (didFetch.current) return;
     didFetch.current = true;
-    loadGrants();
+    (async () => {
+      setLoading(true);
+      setFetchError(null);
+      setSyncErrorMessage(null);
+
+      const [grantsRes, syncStatusRes, pendingRes] = await Promise.all([
+        adminApi.getGrants(),
+        adminApi.getGrantSyncStatus(),
+        adminApi.getGrantPendingChanges(),
+      ]);
+
+      if (grantsRes.error) {
+        setFetchError(grantsRes.error);
+      } else {
+        setGrants((grantsRes.data?.items ?? []).map(normalizeGrant));
+      }
+
+      if (syncStatusRes.error) {
+        setSyncErrorMessage(syncStatusRes.error);
+      } else if (syncStatusRes.data) {
+        setSyncStatus(syncStatusRes.data);
+      }
+
+      if (pendingRes.error) {
+        setSyncErrorMessage(pendingRes.error);
+      } else if (pendingRes.data) {
+        setPendingChanges(pendingRes.data);
+      }
+
+      setLoading(false);
+    })();
   }, []);
 
   const loadGrants = async () => {
@@ -117,6 +175,25 @@ export function GrantsManager() {
       setGrants((data?.items ?? []).map(normalizeGrant));
     }
     setLoading(false);
+  };
+
+  const refreshSyncData = async () => {
+    const [syncStatusRes, pendingRes] = await Promise.all([
+      adminApi.getGrantSyncStatus(),
+      adminApi.getGrantPendingChanges(),
+    ]);
+
+    if (syncStatusRes.error) {
+      setSyncErrorMessage(syncStatusRes.error);
+    } else if (syncStatusRes.data) {
+      setSyncStatus(syncStatusRes.data);
+    }
+
+    if (pendingRes.error) {
+      setSyncErrorMessage(pendingRes.error);
+    } else if (pendingRes.data) {
+      setPendingChanges(pendingRes.data);
+    }
   };
 
   const [addGrantOpen, setAddGrantOpen] = useState(false);
@@ -266,6 +343,86 @@ export function GrantsManager() {
     }
   };
 
+  const handleTriggerSync = async () => {
+    setSyncSuccessMessage(null);
+    setSyncErrorMessage(null);
+    setSyncing(true);
+
+    const { error } = await adminApi.triggerGrantSync();
+
+    setSyncing(false);
+    if (error) {
+      setSyncErrorMessage(error);
+      return;
+    }
+
+    setSyncSuccessMessage('Grant auto-sync started. New scraped diffs will appear after processing.');
+    await refreshSyncData();
+  };
+
+  const handleApproveChange = async (change: PendingChange) => {
+    const { error } = await adminApi.approveGrantPendingChange(change.id);
+    if (error) {
+      setSyncErrorMessage(error);
+      return;
+    }
+
+    const [grantsRes] = await Promise.all([
+      adminApi.getGrants(),
+      refreshSyncData(),
+    ]);
+    if (grantsRes.data) {
+      setGrants((grantsRes.data.items ?? []).map(normalizeGrant));
+    }
+  };
+
+  const handleRejectChange = async (change: PendingChange) => {
+    const { error } = await adminApi.rejectGrantPendingChange(change.id);
+    if (error) {
+      setSyncErrorMessage(error);
+      return;
+    }
+    await refreshSyncData();
+  };
+
+  const handleOpenSyncSettings = async () => {
+    setSyncDialogOpen(true);
+    setSyncSettingsLoading(true);
+    const { data, error } = await adminApi.getGrantSyncSettings();
+    if (error) {
+      setSyncErrorMessage(error);
+    } else if (data) {
+      setSyncSettings(data);
+      setSyncSettingsForm({ schedule: data.schedule ?? undefined, enabled: data.enabled });
+    }
+    setSyncSettingsLoading(false);
+  };
+
+  const handleSaveSyncSettings = async () => {
+    const { data, error } = await adminApi.updateGrantSyncSettings(syncSettingsForm);
+    if (error) {
+      setSyncErrorMessage(error);
+      return;
+    }
+    if (data) {
+      setSyncSettings(data);
+      setSyncDialogOpen(false);
+    }
+  };
+
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return 'N/A';
+    try {
+      return new Date(dateStr).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       title: '',
@@ -328,6 +485,21 @@ export function GrantsManager() {
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<Sync />}
+            onClick={handleOpenSyncSettings}
+            sx={{
+              borderColor: '#D4AF37',
+              color: '#D4AF37',
+              '&:hover': {
+                borderColor: '#E5C158',
+                bgcolor: 'rgba(212, 175, 55, 0.1)',
+              },
+            }}
+          >
+            Auto-Sync Settings
+          </Button>
           <Button
             variant="outlined"
             startIcon={<Upload />}
@@ -444,6 +616,234 @@ export function GrantsManager() {
           </Card>
         </Grid>
       </Grid>
+
+      {/* AI Auto-Sync Status */}
+      <Card sx={{ mb: 3, bgcolor: '#0a0a0a', border: '1px solid rgba(212, 175, 55, 0.2)' }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Sync sx={{ color: '#D4AF37', fontSize: 28 }} />
+              <Box>
+                <Typography variant="h6" sx={{ color: '#D4AF37', fontWeight: 600 }}>
+                  AI-Powered Auto-Sync Status
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#a0a0a0' }}>
+                  Next scheduled check: <strong>{formatDate(syncStatus?.nextScheduledCheck)}</strong>
+                </Typography>
+              </Box>
+            </Box>
+            <Button
+              variant="contained"
+              startIcon={syncing ? <CircularProgress size={16} sx={{ color: '#000000' }} /> : <Refresh />}
+              onClick={handleTriggerSync}
+              disabled={syncing}
+              sx={{
+                bgcolor: '#D4AF37',
+                color: '#000000',
+                fontWeight: 600,
+                '&:hover': { bgcolor: '#E5C158' },
+              }}
+            >
+              {syncing ? 'Syncing...' : 'Run Sync Now'}
+            </Button>
+          </Box>
+
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 4 }}>
+              <Box
+                sx={{
+                  p: 2,
+                  bgcolor: 'rgba(102, 187, 106, 0.1)',
+                  borderRadius: 2,
+                  border: '1px solid rgba(102, 187, 106, 0.3)',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <CheckCircle sx={{ color: '#66bb6a', fontSize: 20 }} />
+                  <Typography variant="h5" sx={{ color: '#ffffff', fontWeight: 700 }}>
+                    {syncStatus?.territoriesSyncing ?? '—'}
+                  </Typography>
+                </Box>
+                <Typography variant="caption" sx={{ color: '#a0a0a0' }}>
+                  Territories Auto-Syncing
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 4 }}>
+              <Box
+                sx={{
+                  p: 2,
+                  bgcolor: 'rgba(255, 167, 38, 0.1)',
+                  borderRadius: 2,
+                  border: '1px solid rgba(255, 167, 38, 0.3)',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <Warning sx={{ color: '#ffa726', fontSize: 20 }} />
+                  <Typography variant="h5" sx={{ color: '#ffffff', fontWeight: 700 }}>
+                    {pendingChanges.length}
+                  </Typography>
+                </Box>
+                <Typography variant="caption" sx={{ color: '#a0a0a0' }}>
+                  Pending Updates
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 4 }}>
+              <Box
+                sx={{
+                  p: 2,
+                  bgcolor: 'rgba(66, 165, 245, 0.1)',
+                  borderRadius: 2,
+                  border: '1px solid rgba(66, 165, 245, 0.3)',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <Schedule sx={{ color: '#42a5f5', fontSize: 20 }} />
+                  <Typography variant="h5" sx={{ color: '#ffffff', fontWeight: 700 }}>
+                    {syncStatus?.daysSinceLastCheck ?? '—'}
+                  </Typography>
+                </Box>
+                <Typography variant="caption" sx={{ color: '#a0a0a0' }}>
+                  Days Since Last Check
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
+
+          {syncSuccessMessage && (
+            <Alert severity="success" sx={{ mt: 2 }}>
+              {syncSuccessMessage}
+            </Alert>
+          )}
+          {syncErrorMessage && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {syncErrorMessage}
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Pending Updates Alert */}
+      {pendingChanges.length > 0 && (
+        <Alert
+          severity="warning"
+          icon={<Warning />}
+          sx={{
+            mb: 4,
+            bgcolor: 'rgba(255, 167, 38, 0.1)',
+            border: '1px solid rgba(255, 167, 38, 0.3)',
+            color: '#ffffff',
+          }}
+          action={(
+            <Button
+              color="inherit"
+              size="small"
+              onClick={() => setShowPendingChanges(!showPendingChanges)}
+              endIcon={showPendingChanges ? <ExpandLess /> : <ExpandMore />}
+            >
+              {showPendingChanges ? 'Hide' : 'Review'}
+            </Button>
+          )}
+        >
+          <Typography variant="body2">
+            <strong>{pendingChanges.length} update(s) detected</strong> by AI auto-sync and awaiting your review
+          </Typography>
+        </Alert>
+      )}
+
+      {/* Pending Changes Section */}
+      <Collapse in={showPendingChanges}>
+        <Paper sx={{ mb: 4, bgcolor: '#0a0a0a', border: '1px solid rgba(255, 152, 0, 0.3)' }}>
+          <Box sx={{ p: 2, bgcolor: 'rgba(255, 152, 0, 0.05)' }}>
+            <Typography variant="h6" sx={{ color: '#ffa726', fontWeight: 600 }}>
+              Pending Grant Changes for Review
+            </Typography>
+          </Box>
+          {pendingChanges.map((change, index) => (
+            <Box
+              key={change.id}
+              sx={{
+                p: 3,
+                borderBottom: index < pendingChanges.length - 1 ? '1px solid rgba(255, 152, 0, 0.1)' : 'none',
+              }}
+            >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Box>
+                  <Typography variant="subtitle1" sx={{ color: '#ffffff', fontWeight: 600, mb: 1 }}>
+                    {change.territory} - {change.field}
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, md: 5 }}>
+                      <Typography variant="caption" sx={{ color: '#a0a0a0', display: 'block', mb: 0.5 }}>
+                        Current Value:
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: '#f44336', fontWeight: 600 }}>
+                        {change.currentValue ?? 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 2 }} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Typography sx={{ color: '#666' }}>→</Typography>
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 5 }}>
+                      <Typography variant="caption" sx={{ color: '#a0a0a0', display: 'block', mb: 0.5 }}>
+                        Detected Value:
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: '#66bb6a', fontWeight: 600 }}>
+                        {change.detectedValue}
+                      </Typography>
+                    </Grid>
+                  </Grid>
+                  <Box sx={{ mt: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+                    <Chip
+                      label={`${change.confidence.toUpperCase()} CONFIDENCE`}
+                      size="small"
+                      sx={{
+                        bgcolor: change.confidence === 'high' ? 'rgba(46, 125, 50, 0.2)' : 'rgba(255, 152, 0, 0.2)',
+                        color: change.confidence === 'high' ? '#66bb6a' : '#ffa726',
+                        fontWeight: 600,
+                      }}
+                    />
+                    <Typography variant="caption" sx={{ color: '#a0a0a0' }}>
+                      {change.source}
+                    </Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    startIcon={<CheckCircle />}
+                    onClick={() => handleApproveChange(change)}
+                    sx={{
+                      bgcolor: '#66bb6a',
+                      color: '#000000',
+                      '&:hover': { bgcolor: '#4caf50' },
+                    }}
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => handleRejectChange(change)}
+                    sx={{
+                      borderColor: '#666',
+                      color: '#a0a0a0',
+                      '&:hover': {
+                        borderColor: '#999',
+                        bgcolor: 'rgba(255, 255, 255, 0.05)',
+                      },
+                    }}
+                  >
+                    Reject
+                  </Button>
+                </Box>
+              </Box>
+            </Box>
+          ))}
+        </Paper>
+      </Collapse>
 
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: 'rgba(212, 175, 55, 0.2)' }}>
@@ -585,6 +985,90 @@ export function GrantsManager() {
         </DialogActions>
       </Dialog>
 
+      {/* Auto-Sync Settings Dialog */}
+      <Dialog
+        open={syncDialogOpen}
+        onClose={() => setSyncDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: '#0a0a0a',
+            border: '1px solid rgba(212, 175, 55, 0.2)',
+          },
+        }}
+      >
+        <DialogTitle sx={{ color: '#D4AF37', fontWeight: 600 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Schedule />
+            Auto-Sync Configuration
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {syncSettingsLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress sx={{ color: '#D4AF37' }} />
+            </Box>
+          ) : (
+            <>
+              <Alert severity="info" sx={{ mb: 3, bgcolor: 'rgba(33, 150, 243, 0.1)', color: '#42a5f5' }}>
+                <strong>How it works:</strong> Our scraper reads official grants sources, extracts structured changes,
+                and queues them for admin moderation before they are applied.
+              </Alert>
+
+              {syncSettings && (
+                <Box sx={{ mb: 3, p: 2, bgcolor: '#1a1a1a', borderRadius: 2, border: '1px solid rgba(212, 175, 55, 0.1)' }}>
+                  <Typography variant="body2" sx={{ color: '#a0a0a0' }}>
+                    Last sync: <strong style={{ color: '#ffffff' }}>{formatDate(syncSettings.lastSyncAt)}</strong>
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#a0a0a0', mt: 0.5 }}>
+                    Next scheduled: <strong style={{ color: '#ffffff' }}>{formatDate(syncSettings.nextScheduledCheck)}</strong>
+                  </Typography>
+                </Box>
+              )}
+
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" sx={{ color: '#a0a0a0', mb: 1 }}>
+                  Sync Schedule:
+                </Typography>
+                <TextField
+                  select
+                  fullWidth
+                  value={syncSettingsForm.schedule || syncSettings?.schedule || 'quarterly'}
+                  onChange={(e) => setSyncSettingsForm({
+                    ...syncSettingsForm,
+                    schedule: e.target.value as SyncSettingsUpdate['schedule'],
+                  })}
+                  SelectProps={{ native: true }}
+                >
+                  <option value="monthly">Monthly (1st of each month)</option>
+                  <option value="quarterly">Quarterly (Jan, Apr, Jul, Oct)</option>
+                  <option value="biannual">Semi-Annual (Jan, Jul)</option>
+                  <option value="annual">Annual (January)</option>
+                </TextField>
+              </Box>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button onClick={() => setSyncDialogOpen(false)} sx={{ color: '#a0a0a0' }}>
+            Close
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveSyncSettings}
+            disabled={syncSettingsLoading}
+            sx={{
+              bgcolor: '#D4AF37',
+              color: '#000000',
+              '&:hover': { bgcolor: '#E5C158' },
+            }}
+          >
+            Save Settings
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Bulk Import Dialog */}
       <BulkImportDialog
         open={bulkImportOpen}
@@ -646,8 +1130,11 @@ function GrantsTable({
           </TableRow>
         </TableHead>
         <TableBody>
-          {grants.map((grant) => (
-            <TableRow key={grant.id} sx={{ '&:hover': { bgcolor: 'rgba(212, 175, 55, 0.05)' } }}>
+          {grants.map((grant) => {
+            const source = (typeof grant.dataSource === 'string' ? grant.dataSource : 'manual') as Grant['dataSource'];
+            const isManual = source === 'manual';
+            return (
+              <TableRow key={grant.id} sx={{ '&:hover': { bgcolor: 'rgba(212, 175, 55, 0.05)' } }}>
               <TableCell sx={{ color: '#ffffff' }}>
                 <Box>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -696,11 +1183,11 @@ function GrantsTable({
               </TableCell>
               <TableCell>
                 <Chip
-                  label={grant.dataSource.toUpperCase()}
+                  label={source.toUpperCase()}
                   size="small"
                   sx={{
-                    bgcolor: grant.dataSource === 'manual' ? 'rgba(33, 150, 243, 0.2)' : 'rgba(156, 39, 176, 0.2)',
-                    color: grant.dataSource === 'manual' ? '#2196F3' : '#9C27B0',
+                    bgcolor: isManual ? 'rgba(33, 150, 243, 0.2)' : 'rgba(156, 39, 176, 0.2)',
+                    color: isManual ? '#2196F3' : '#9C27B0',
                   }}
                 />
               </TableCell>
@@ -739,8 +1226,9 @@ function GrantsTable({
                   </Tooltip>
                 </Box>
               </TableCell>
-            </TableRow>
-          ))}
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </TableContainer>

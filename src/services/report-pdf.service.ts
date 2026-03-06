@@ -4,6 +4,41 @@
  */
 
 import type { ScriptAnalysis } from '@/app/contexts/ScriptContext';
+import { apiClient } from '@/services/api';
+
+/**
+ * Download a backend-generated PDF report as a file.
+ */
+export async function downloadReportPDF(reportId: string, filename?: string): Promise<void> {
+  const blob = await apiClient.get<Blob>(`/api/reports/${reportId}/pdf`, {
+    auth: true,
+    responseType: 'blob',
+  });
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename ? `${filename}.pdf` : `report-${reportId}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Open a backend-generated PDF report in a new browser tab.
+ */
+export async function viewReportPDF(reportId: string): Promise<void> {
+  const blob = await apiClient.get<Blob>(`/api/reports/${reportId}/pdf`, {
+    auth: true,
+    responseType: 'blob',
+  });
+
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener');
+  // Revoke after a delay to allow the tab to load
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
 
 /**
  * Generate and download a PDF report from analysis data
