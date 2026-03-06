@@ -77,6 +77,15 @@ export class DatabaseService {
     }
   }
 
+  async getReportPdfUrl(reportId: string): Promise<{ pdfUrl: string | null; error: string | null }> {
+    try {
+      const data = await apiClient.get<{ pdf_url: string }>(`/api/reports/${reportId}/pdf`, { auth: true });
+      return { pdfUrl: data.pdf_url, error: null };
+    } catch (error) {
+      return { pdfUrl: null, error: error instanceof Error ? error.message : 'Failed to fetch PDF URL' };
+    }
+  }
+
   async getReportByShareToken(shareToken: string): Promise<{ report: Report | null; error: string | null }> {
     try {
       const report = await apiClient.get<Report>(`/api/reports/shared/${shareToken}`);

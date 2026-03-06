@@ -92,29 +92,33 @@ interface WeatherLogistics {
 }
 
 interface FundingOpportunity {
-  type: 'Broadcaster' | 'Fund' | 'Festival';
+  type: 'Fund' | 'Festival';
   name: string;
   genre: string[];
-  deadline?: string;
-  website: string;
+  deadline: string;
   notes: string;
+  website?: string;
+  tier?: string;
 }
 
 interface ScriptMetadata {
   title: string;
-  genre: string;
+  genre: string[];
   budget: string;
   format: string;
   country: string;
   stateProvince?: string;
-  cameraEquipment?: string;
-  crewSize?: string;
-  principalCast?: string;
-  supportingCast?: string;
-  filmingStart: string;
-  filmingDuration: string;
+  locationStrategy: string;
+  productionPriority: string;
+  territoriesConsidering?: string[];
+  filmingStart?: string;
+  filmingDuration?: string;
+  cameraEquipment?: string[];
+  crewSize?: number;
+  principalCast?: number;
+  supportingCast?: number;
   targetAudience?: string;
-  languageDialects?: string;
+  language?: string;
 }
 
 interface ScriptContextType {
@@ -123,7 +127,7 @@ interface ScriptContextType {
   analysis: ScriptAnalysis | null;
   setAnalysis: (analysis: ScriptAnalysis | null) => void;
   generateAnalysis: (file: File, metadata: ScriptMetadata) => Promise<ScriptAnalysis>;
-  generatePreview: (file: File, metadata: ScriptMetadata) => Promise<ScriptAnalysis>;
+  generatePreview: (metadata: ScriptMetadata) => Promise<ScriptAnalysis>;
   isProcessing: boolean;
 }
 
@@ -158,6 +162,35 @@ function formatCurrency(amount: number): string {
 
 function toArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function buildReportRequestBody(
+  metadata: ScriptMetadata,
+  reportType: 'preview' | 'paid' | 'b2b',
+  scriptFilePath?: string
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    script_title: metadata.title,
+    report_type: reportType,
+    genre: metadata.genre,
+    budget_range: metadata.budget,
+    format: metadata.format,
+    country: metadata.country,
+    location_strategy: metadata.locationStrategy,
+    production_priority: metadata.productionPriority,
+  };
+  if (scriptFilePath) body.script_file_path = scriptFilePath;
+  if (metadata.stateProvince) body.state_province = metadata.stateProvince;
+  if (metadata.territoriesConsidering?.length) body.territories_considering = metadata.territoriesConsidering;
+  if (metadata.filmingStart) body.filming_start_date = metadata.filmingStart;
+  if (metadata.filmingDuration) body.filming_duration = Number(metadata.filmingDuration);
+  if (metadata.cameraEquipment?.length) body.camera_equipment = metadata.cameraEquipment;
+  if (metadata.crewSize) body.crew_size = metadata.crewSize;
+  if (metadata.principalCast) body.principal_cast = metadata.principalCast;
+  if (metadata.supportingCast) body.supporting_cast = metadata.supportingCast;
+  if (metadata.targetAudience) body.target_audience = metadata.targetAudience;
+  if (metadata.language) body.language = metadata.language;
+  return body;
 }
 
 function mapReportToAnalysis(report: any, metadata: ScriptMetadata, isPreview = false): ScriptAnalysis {
@@ -239,7 +272,7 @@ function mapReportToAnalysis(report: any, metadata: ScriptMetadata, isPreview = 
 
   const comparables: ComparableProduction[] = toArray<any>(reportData.comparableProductions).map((item: any) => ({
     title: item.title || 'Comparable Project',
-    genre: toArray<string>(item.genres).join(', ') || metadata.genre,
+    genre: toArray<string>(item.genres).join(', ') || metadata.genre.join(', '),
     budgetRange: item.budget || metadata.budget,
     visualScale: 'Comparable production scale',
     location: item.territory || 'Unknown',
@@ -259,23 +292,22 @@ function mapReportToAnalysis(report: any, metadata: ScriptMetadata, isPreview = 
     ...toArray<any>(reportData.grantOpportunities).map((grant: any) => ({
       type: 'Fund' as const,
       name: grant.title || 'Grant Opportunity',
-      genre: metadata.genre.split(',').map((g) => g.trim()).filter(Boolean),
-      deadline: grant.deadline,
-      website: '#',
+      genre: metadata.genre,
+      deadline: grant.deadline || '',
       notes: `${grant.organization || 'Program'} • ${grant.amount || 'Amount varies'}`,
     })),
     ...toArray<any>(reportData.festivalRecommendations).map((festival: any) => ({
       type: 'Festival' as const,
       name: festival.name || 'Festival Opportunity',
-      genre: metadata.genre.split(',').map((g) => g.trim()).filter(Boolean),
-      deadline: festival.deadline,
-      website: '#',
+      genre: metadata.genre,
+      deadline: festival.deadline || '',
       notes: `${festival.location || 'Global'} • Tier ${festival.tier || 'N/A'}`,
+      tier: festival.tier,
     })),
   ];
 
   const genres = toArray<string>(productionDetails.genres);
-  const genre = genres.length ? genres.join(', ') : metadata.genre || 'Unknown';
+  const genre = genres.length ? genres.join(', ') : (metadata.genre.length ? metadata.genre.join(', ') : 'Unknown');
   const shootingDays = Number(productionDetails.estimatedShootingDays || 0);
 
   return {
@@ -300,9 +332,9 @@ function buildPreviewAnalysis(metadata: ScriptMetadata): ScriptAnalysis {
   const primaryTerritory = metadata.country || 'uk';
 
   return {
-    genre: metadata.genre || 'Drama',
+    genre: metadata.genre.length ? metadata.genre.join(', ') : 'Drama',
     tone: metadata.targetAudience || 'Preview estimate based on supplied production metadata',
-    scale: `${metadata.format || 'feature'} • ${metadata.budget || 'budget TBD'}`,
+    scale: `${metadata.format || 'Feature Film'} • ${metadata.budget || 'budget TBD'}`,
     complexity: 'Medium',
     locationRankings: [
       {
@@ -403,22 +435,31 @@ export function ScriptProvider({ children }: { children: ReactNode }) {
         throw new Error(upload.error || 'Failed to upload script');
       }
 
-      const created = await databaseService.createReport(user.id, metadata.title, 'paid', upload.path);
-      if (created.error || !created.reportId) {
-        throw new Error(created.error || 'Failed to create report');
+      const body = buildReportRequestBody(metadata, 'paid', upload.path);
+      const createResponse = await apiClient.post<{ status: string; report_id: string }>(
+        '/api/reports',
+        body,
+        { auth: true }
+      );
+      if (!createResponse.report_id) {
+        throw new Error('Failed to create report');
       }
 
-      const status = await pollReportStatus(created.reportId);
+      const status = await pollReportStatus(createResponse.report_id);
       if (status.status === 'failed') {
         throw new Error(status.error || status.message || 'Report generation failed');
       }
 
-      const { report, error } = await databaseService.getReport(created.reportId);
+      const { report, error } = await databaseService.getReport(createResponse.report_id);
       if (error || !report) {
         throw new Error(error || 'Failed to fetch completed report');
       }
 
-      const mapped = mapReportToAnalysis(report, metadata);
+      // Use direct analysis if backend returns it in the guide's shape, else fall back to mapper
+      const analysisData = (report as any).analysis;
+      const mapped = analysisData?.locationRankings
+        ? { ...analysisData, id: report.id, scriptTitle: metadata.title, generatedAt: report.completed_at || new Date().toISOString() }
+        : mapReportToAnalysis(report, metadata);
       setAnalysis(mapped);
       return mapped;
     } finally {
@@ -426,14 +467,29 @@ export function ScriptProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Preview remains local-only until a dedicated backend preview endpoint is added.
-  const generatePreview = async (_file: File, metadata: ScriptMetadata): Promise<ScriptAnalysis> => {
+  // Preview calls POST /api/reports with report_type "preview" — synchronous, no auth needed.
+  const generatePreview = async (metadata: ScriptMetadata): Promise<ScriptAnalysis> => {
     setIsProcessing(true);
 
     try {
-      const previewData = buildPreviewAnalysis(metadata);
-      setAnalysis(previewData);
-      return previewData;
+      const body = buildReportRequestBody(metadata, 'preview');
+      const response = await apiClient.post<{ reportType: string; analysis: ScriptAnalysis }>(
+        '/api/reports',
+        body
+      );
+
+      const analysisData: ScriptAnalysis = {
+        ...response.analysis,
+        scriptTitle: metadata.title,
+        generatedAt: new Date().toISOString(),
+      };
+      setAnalysis(analysisData);
+      return analysisData;
+    } catch (err) {
+      // Fall back to local preview if backend preview fails
+      const fallback = buildPreviewAnalysis(metadata);
+      setAnalysis(fallback);
+      return fallback;
     } finally {
       setIsProcessing(false);
     }

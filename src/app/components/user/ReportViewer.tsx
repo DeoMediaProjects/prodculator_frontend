@@ -36,7 +36,6 @@ import {
   TrendingUp,
   Info,
   Lock,
-  Share,
 } from '@mui/icons-material';
 import { useScript } from '@/app/contexts/ScriptContext';
 import { generateReportPDF } from '@/services/report-pdf.service';
@@ -226,15 +225,27 @@ export function ReportViewer() {
               <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>Global Territory Rankings</Typography>
               {analysis.locationRankings.map((loc, i) => (
                 <Paper key={i} sx={{ p: 3, mb: 2, bgcolor: '#111', border: '1px solid #222' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                    <Box><Typography variant="h6" sx={{ color: '#D4AF37' }}>{loc.name}, {loc.country}</Typography></Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Typography variant="h6" sx={{ color: '#D4AF37' }}>{loc.name}, {loc.country}</Typography>
+                      {loc.isAssessmentOnly && (
+                        <Chip label="Assessment Only" size="small" sx={{ bgcolor: 'rgba(212, 175, 55, 0.2)', color: '#D4AF37', border: '1px solid #D4AF37', fontSize: '0.7rem' }} />
+                      )}
+                    </Box>
                     <Chip label={`Score: ${loc.score}/100`} sx={{ bgcolor: '#D4AF37', color: '#000', fontWeight: 700 }} />
                   </Box>
                   <Grid container spacing={2} sx={{ mb: 2 }}>
-                    {['Cost', 'Crew', 'Incentives'].map((label, idx) => (
-                      <Grid size={{ xs: 4 }} key={idx}>
-                        <Typography variant="caption" sx={{ color: '#666' }}>{label}</Typography>
-                        <LinearProgress variant="determinate" value={idx === 0 ? loc.costEfficiency : idx === 1 ? loc.crewDepth : loc.incentiveStrength} sx={{ mt: 1, height: 6, borderRadius: 3, bgcolor: '#222', '& .MuiLinearProgress-bar': { bgcolor: '#D4AF37' } }} />
+                    {[
+                      { label: 'Cost Efficiency', value: loc.costEfficiency },
+                      { label: 'Crew Depth', value: loc.crewDepth },
+                      { label: 'Infrastructure', value: loc.infrastructure },
+                      { label: 'Incentive Strength', value: loc.incentiveStrength },
+                      { label: 'Currency Advantage', value: loc.currencyAdvantage },
+                    ].map((metric) => (
+                      <Grid size={{ xs: 6, sm: 4, md: 2.4 }} key={metric.label}>
+                        <Typography variant="caption" sx={{ color: '#666' }}>{metric.label}</Typography>
+                        <LinearProgress variant="determinate" value={metric.value} sx={{ mt: 1, height: 6, borderRadius: 3, bgcolor: '#222', '& .MuiLinearProgress-bar': { bgcolor: metric.value >= 80 ? '#4caf50' : metric.value >= 60 ? '#2196f3' : metric.value >= 40 ? '#D4AF37' : '#ff9800' } }} />
+                        <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem' }}>{metric.value}/100</Typography>
                       </Grid>
                     ))}
                   </Grid>
@@ -248,29 +259,254 @@ export function ReportViewer() {
             {/* Tab 3: Tax Incentives */}
             <TabPanel value={tabValue} index={2}>
               <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>Tax Incentive Estimates</Typography>
-              <Grid container spacing={3}>
-                {analysis.incentiveEstimates.map((inc, i) => (
-                  <Grid size={{ xs: 12, md: 6 }} key={i}>
-                    <Paper sx={{ p: 3, bgcolor: '#111', border: '1px solid #222', height: '100%' }}>
-                      <Typography variant="h6" sx={{ color: '#D4AF37', mb: 1 }}>{inc.territory}</Typography>
-                      <Typography variant="body2" sx={{ color: '#666', mb: 2 }}>{inc.program}</Typography>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="body2">Estimated Rebate:</Typography>
-                        <Typography variant="h6" sx={{ color: '#4caf50' }}>{inc.estimatedRebate}</Typography>
-                      </Box>
-                      <Divider sx={{ my: 2, borderColor: '#333' }} />
-                      <Typography variant="caption" sx={{ color: '#666' }}>{inc.requirements[0]}</Typography>
+              {isPreview && (
+                <Box sx={{ position: 'relative' }}>
+                  <Box sx={{ filter: 'blur(4px)', pointerEvents: 'none', userSelect: 'none' }}>
+                    <Grid container spacing={3}>
+                      {analysis.incentiveEstimates.map((inc, i) => (
+                        <Grid size={{ xs: 12, md: 6 }} key={i}>
+                          <Paper sx={{ p: 3, bgcolor: '#111', border: '1px solid #222', height: '100%' }}>
+                            <Typography variant="h6" sx={{ color: '#D4AF37', mb: 1 }}>{inc.territory}</Typography>
+                            <Typography variant="body2" sx={{ color: '#666', mb: 2 }}>{inc.program}</Typography>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                              <Typography variant="body2">Rate:</Typography>
+                              <Typography variant="body1" sx={{ fontWeight: 600 }}>{inc.rate}</Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                              <Typography variant="body2">Estimated Rebate:</Typography>
+                              <Typography variant="h6" sx={{ color: '#4caf50' }}>{inc.estimatedRebate}</Typography>
+                            </Box>
+                          </Paper>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Box>
+                  <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                    <Paper sx={{ p: 4, bgcolor: 'rgba(0,0,0,0.9)', border: '1px solid #D4AF37', textAlign: 'center' }}>
+                      <Lock sx={{ fontSize: 40, color: '#D4AF37', mb: 1 }} />
+                      <Typography variant="h6" sx={{ color: '#fff', mb: 1 }}>Upgrade for Full Details</Typography>
+                      <Typography variant="body2" sx={{ color: '#a0a0a0', mb: 2 }}>Get detailed rebate calculations, eligibility requirements, and qualifying spend analysis.</Typography>
+                      <Button variant="contained" onClick={() => navigate('/pricing')} sx={{ bgcolor: '#D4AF37', color: '#000', '&:hover': { bgcolor: '#E5C158' } }}>Upgrade Now</Button>
                     </Paper>
-                  </Grid>
-                ))}
-              </Grid>
+                  </Box>
+                </Box>
+              )}
+              {!isPreview && (
+                <Grid container spacing={3}>
+                  {analysis.incentiveEstimates.map((inc, i) => (
+                    <Grid size={{ xs: 12, md: 6 }} key={i}>
+                      <Paper sx={{ p: 3, bgcolor: '#111', border: '1px solid #222', height: '100%' }}>
+                        <Typography variant="h6" sx={{ color: '#D4AF37', mb: 1 }}>{inc.territory}</Typography>
+                        <Typography variant="body2" sx={{ color: '#666', mb: 2 }}>{inc.program}</Typography>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                          <Typography variant="body2">Rate:</Typography>
+                          <Typography variant="body1" sx={{ fontWeight: 600 }}>{inc.rate}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                          <Typography variant="body2">Cap:</Typography>
+                          <Typography variant="body1">{inc.cap}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                          <Typography variant="body2">Qualifying Spend:</Typography>
+                          <Typography variant="body2" sx={{ color: '#a0a0a0' }}>{inc.qualifyingSpend}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                          <Typography variant="body2">Estimated Rebate:</Typography>
+                          <Typography variant="h6" sx={{ color: '#4caf50' }}>{inc.estimatedRebate}</Typography>
+                        </Box>
+                        <Divider sx={{ my: 2, borderColor: '#333' }} />
+                        <Typography variant="subtitle2" sx={{ mb: 1, color: '#D4AF37' }}>Requirements:</Typography>
+                        <List dense>{inc.requirements.map((r, ri) => <ListItem key={ri} sx={{ color: '#a0a0a0', py: 0.25 }}>• {r}</ListItem>)}</List>
+                        <Typography variant="caption" sx={{ color: '#555', display: 'block', mt: 1 }}>{inc.disclaimer}</Typography>
+                        <Typography variant="caption" sx={{ color: '#444', display: 'block' }}>Source: {inc.dataSource} • Updated: {new Date(inc.lastUpdated).toLocaleDateString()}</Typography>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
             </TabPanel>
 
-            {/* Locked Tabs */}
-            <TabPanel value={tabValue} index={3}>{isPreview ? <BlurredContent title="Crew & Cost" /> : <Typography>Crew Data Here</Typography>}</TabPanel>
-            <TabPanel value={tabValue} index={4}>{isPreview ? <BlurredContent title="Comparables" /> : <Typography>Comparables Data Here</Typography>}</TabPanel>
-            <TabPanel value={tabValue} index={5}>{isPreview ? <BlurredContent title="Weather & Logistics" /> : <Typography>Weather Data Here</Typography>}</TabPanel>
-            <TabPanel value={tabValue} index={6}>{isPreview ? <BlurredContent title="Funding & Festivals" /> : <Typography>Funding Data Here</Typography>}</TabPanel>
+            {/* Tab 4: Crew & Cost */}
+            <TabPanel value={tabValue} index={3}>
+              {isPreview ? <BlurredContent title="Crew & Cost" /> : (
+                <>
+                  <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>Crew Insights by Territory</Typography>
+                  <Grid container spacing={3}>
+                    {analysis.crewInsights.map((crew, i) => (
+                      <Grid size={{ xs: 12, md: 6 }} key={i}>
+                        <Paper sx={{ p: 3, bgcolor: '#111', border: '1px solid #222', height: '100%' }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                            <Typography variant="h6" sx={{ color: '#D4AF37' }}>{crew.territory}</Typography>
+                            <Chip
+                              label={crew.availability}
+                              size="small"
+                              sx={{
+                                bgcolor: crew.availability === 'High' ? 'rgba(76, 175, 80, 0.2)' : crew.availability === 'Medium' ? 'rgba(212, 175, 55, 0.2)' : 'rgba(244, 67, 54, 0.2)',
+                                color: crew.availability === 'High' ? '#4caf50' : crew.availability === 'Medium' ? '#D4AF37' : '#f44336',
+                                fontWeight: 600,
+                              }}
+                            />
+                          </Box>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                            <Typography variant="body2" sx={{ color: '#a0a0a0' }}>Crew Cost:</Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 600 }}>{crew.costVsUSD}</Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                            <Typography variant="body2" sx={{ color: '#a0a0a0' }}>Quality Rating:</Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 600 }}>{crew.qualityRating.toFixed(1)}/5</Typography>
+                          </Box>
+                          <Typography variant="subtitle2" sx={{ color: '#D4AF37', mb: 1 }}>Specialties:</Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
+                            {crew.specialties.map((s, si) => (
+                              <Chip key={si} label={s} size="small" sx={{ bgcolor: '#222', color: '#a0a0a0', fontSize: '0.75rem' }} />
+                            ))}
+                          </Box>
+                          <Divider sx={{ my: 1, borderColor: '#333' }} />
+                          <Typography variant="body2" sx={{ color: '#888', fontStyle: 'italic' }}>{crew.tradeoff}</Typography>
+                        </Paper>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </>
+              )}
+            </TabPanel>
+
+            {/* Tab 5: Comparables */}
+            <TabPanel value={tabValue} index={4}>
+              {isPreview ? <BlurredContent title="Comparables" /> : (
+                <>
+                  <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>Comparable Productions</Typography>
+                  <TableContainer component={Paper} sx={{ bgcolor: '#111' }}>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ color: '#D4AF37', fontWeight: 600 }}>Title</TableCell>
+                          <TableCell sx={{ color: '#D4AF37', fontWeight: 600 }}>Genre</TableCell>
+                          <TableCell sx={{ color: '#D4AF37', fontWeight: 600 }}>Budget</TableCell>
+                          <TableCell sx={{ color: '#D4AF37', fontWeight: 600 }}>Location</TableCell>
+                          <TableCell sx={{ color: '#D4AF37', fontWeight: 600 }}>Year</TableCell>
+                          <TableCell sx={{ color: '#D4AF37', fontWeight: 600 }}>Source</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {analysis.comparables.map((comp, i) => (
+                          <TableRow key={i}>
+                            <TableCell sx={{ color: '#fff', fontWeight: 500 }}>{comp.title}</TableCell>
+                            <TableCell sx={{ color: '#a0a0a0' }}>{comp.genre}</TableCell>
+                            <TableCell sx={{ color: '#a0a0a0' }}>{comp.budgetRange}</TableCell>
+                            <TableCell sx={{ color: '#a0a0a0' }}>{comp.location}</TableCell>
+                            <TableCell sx={{ color: '#a0a0a0' }}>{comp.year}</TableCell>
+                            <TableCell sx={{ color: '#666' }}>{comp.source}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </>
+              )}
+            </TabPanel>
+
+            {/* Tab 6: Weather & Logistics */}
+            <TabPanel value={tabValue} index={5}>
+              {isPreview ? <BlurredContent title="Weather & Logistics" /> : (
+                <>
+                  <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>Weather & Logistics</Typography>
+                  <Grid container spacing={3}>
+                    {analysis.weatherLogistics.map((weather, i) => (
+                      <Grid size={{ xs: 12, md: 6 }} key={i}>
+                        <Paper sx={{ p: 3, bgcolor: '#111', border: '1px solid #222', height: '100%' }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                            <Typography variant="h6" sx={{ color: '#D4AF37' }}>{weather.territory}</Typography>
+                            <Chip
+                              label={`Risk: ${weather.weatherRisk}`}
+                              size="small"
+                              sx={{
+                                bgcolor: weather.weatherRisk === 'Low' ? 'rgba(76, 175, 80, 0.2)' : weather.weatherRisk === 'Medium' ? 'rgba(212, 175, 55, 0.2)' : 'rgba(244, 67, 54, 0.2)',
+                                color: weather.weatherRisk === 'Low' ? '#4caf50' : weather.weatherRisk === 'Medium' ? '#D4AF37' : '#f44336',
+                                fontWeight: 600,
+                              }}
+                            />
+                          </Box>
+                          <Box sx={{ mb: 2 }}>
+                            <Typography variant="subtitle2" sx={{ color: '#D4AF37', mb: 0.5 }}>Best Months:</Typography>
+                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                              {weather.bestMonths.map((m, mi) => (
+                                <Chip key={mi} label={m} size="small" sx={{ bgcolor: '#222', color: '#a0a0a0' }} />
+                              ))}
+                            </Box>
+                          </Box>
+                          {weather.avgTempRange && (
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                              <Typography variant="body2" sx={{ color: '#a0a0a0' }}>Temp Range:</Typography>
+                              <Typography variant="body2">{weather.avgTempRange}</Typography>
+                            </Box>
+                          )}
+                          {weather.daylightHours && (
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                              <Typography variant="body2" sx={{ color: '#a0a0a0' }}>Daylight:</Typography>
+                              <Typography variant="body2">{weather.daylightHours}</Typography>
+                            </Box>
+                          )}
+                          <Divider sx={{ my: 1.5, borderColor: '#333' }} />
+                          <Typography variant="body2" sx={{ color: '#a0a0a0', mb: 0.5 }}>{weather.infrastructure}</Typography>
+                          <Typography variant="body2" sx={{ color: '#888' }}>{weather.travelVisa}</Typography>
+                          {weather.seasonalConsiderations && (
+                            <Typography variant="body2" sx={{ color: '#888', mt: 0.5, fontStyle: 'italic' }}>{weather.seasonalConsiderations}</Typography>
+                          )}
+                        </Paper>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </>
+              )}
+            </TabPanel>
+
+            {/* Tab 7: Funding & Festivals */}
+            <TabPanel value={tabValue} index={6}>
+              {isPreview ? <BlurredContent title="Funding & Festivals" /> : (
+                <>
+                  <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>Funding & Festival Opportunities</Typography>
+                  <Grid container spacing={3}>
+                    {analysis.fundingOpportunities.map((opp, i) => (
+                      <Grid size={{ xs: 12, md: 6 }} key={i}>
+                        <Paper sx={{ p: 3, bgcolor: '#111', border: '1px solid #222', height: '100%' }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                            <Typography variant="h6" sx={{ color: '#D4AF37' }}>{opp.name}</Typography>
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              <Chip
+                                label={opp.type}
+                                size="small"
+                                sx={{ bgcolor: opp.type === 'Fund' ? 'rgba(76, 175, 80, 0.2)' : 'rgba(33, 150, 243, 0.2)', color: opp.type === 'Fund' ? '#4caf50' : '#2196f3', fontWeight: 600 }}
+                              />
+                              {opp.tier && (
+                                <Chip label={opp.tier} size="small" sx={{ bgcolor: '#222', color: '#a0a0a0' }} />
+                              )}
+                            </Box>
+                          </Box>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
+                            {opp.genre.map((g, gi) => (
+                              <Chip key={gi} label={g} size="small" sx={{ bgcolor: 'rgba(212, 175, 55, 0.1)', color: '#D4AF37', fontSize: '0.7rem' }} />
+                            ))}
+                          </Box>
+                          {opp.deadline && (
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                              <Typography variant="body2" sx={{ color: '#a0a0a0' }}>Deadline:</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 500 }}>{opp.deadline}</Typography>
+                            </Box>
+                          )}
+                          <Typography variant="body2" sx={{ color: '#888' }}>{opp.notes}</Typography>
+                          {opp.website && (
+                            <Button size="small" href={opp.website} target="_blank" sx={{ mt: 1, color: '#D4AF37', textTransform: 'none', p: 0 }}>
+                              Visit Website
+                            </Button>
+                          )}
+                        </Paper>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </>
+              )}
+            </TabPanel>
           </Box>
         </Paper>
       </Container>
