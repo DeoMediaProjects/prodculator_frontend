@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Typography,
@@ -6,97 +6,226 @@ import {
   CardContent,
   Grid,
   TextField,
+  MenuItem,
   Button,
   Chip,
   Switch,
   FormControlLabel,
   Divider,
   Alert,
+  CircularProgress,
 } from '@mui/material';
-import { Save, CheckCircle, Warning, Refresh } from '@mui/icons-material';
+import { Save, CheckCircle, Warning, Refresh, Schedule } from '@mui/icons-material';
+import { adminApi } from '@/services/admin.api';
+import type { DataSource, DataSourceSyncSchedule, SyncScheduleItem } from '@/services/admin.types';
 
-interface DataSourceConfig {
-  name: string;
-  description: string;
-  credentialMode: string;
-  enabled: boolean;
-  status: 'active' | 'inactive' | 'error';
-  lastSync?: string;
-  endpoint?: string;
-}
-
-const initialDataSources: DataSourceConfig[] = [
-  {
-    name: 'Backend AI Analysis (OpenAI)',
-    description: 'Script analysis is executed server-side only',
-    credentialMode: 'Managed in backend env',
-    enabled: true,
-    status: 'active',
-    lastSync: '2026-02-23',
-    endpoint: '/api/scripts/analyze',
-  },
-  {
-    name: 'Backend Data Store',
-    description: 'Database and storage access are handled by backend services',
-    credentialMode: 'Managed in backend env',
-    enabled: true,
-    status: 'active',
-    lastSync: '2026-02-23',
-    endpoint: '/api/* (backend module routers)',
-  },
-  {
-    name: 'Google Maps Platform',
-    description: 'Geocoding and location data',
-    credentialMode: 'Frontend-safe key only',
-    enabled: true,
-    status: 'active',
-    lastSync: '2026-02-23',
-    endpoint: 'https://maps.googleapis.com/maps/api',
-  },
-  {
-    name: 'TMDB API',
-    description: 'Film metadata and comparable productions',
-    credentialMode: 'Optional frontend key',
-    enabled: false,
-    status: 'inactive',
-    endpoint: 'https://api.themoviedb.org/3',
-  },
-  {
-    name: 'ExchangeRate API',
-    description: 'Currency conversion rates',
-    credentialMode: 'Optional frontend key',
-    enabled: false,
-    status: 'inactive',
-    endpoint: 'https://api.exchangerate-api.com/v4',
-  },
-  {
-    name: 'U.S. Bureau of Labor Statistics',
-    description: 'Crew wage data (public API)',
-    credentialMode: 'No key required',
-    enabled: true,
-    status: 'active',
-    lastSync: '2026-02-20',
-    endpoint: 'https://api.bls.gov/publicAPI/v2',
-  },
+const SYNC_SCHEDULE_OPTIONS: { value: DataSourceSyncSchedule; label: string }[] = [
+  { value: 'on-demand', label: 'On demand' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'semi_annual', label: 'Semi annual' },
+  { value: 'annual', label: 'Annual' },
+  { value: null, label: 'Not scheduled' },
 ];
 
+function formatDateTime(date: string | null) {
+  if (!date) return 'Never';
+  try {
+    return new Date(date).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return date;
+  }
+}
+
+function formatScheduleLabel(schedule: DataSourceSyncSchedule) {
+  const option = SYNC_SCHEDULE_OPTIONS.find((item) => item.value === schedule);
+  return option?.label ?? 'Unknown';
+}
+
+function getCredentialLabel(source: DataSource) {
+  if (source.credential_mode === 'backend_env') return 'Managed in backend environment';
+  return source.credential_mode;
+}
+
+function getStatusChip(source: DataSource) {
+  if (!source.is_implemented) {
+    return {
+      label: 'Planned',
+      color: '#ffa726',
+      bgColor: 'rgba(255, 167, 38, 0.15)',
+      icon: <Schedule sx={{ fontSize: 16 }} />,
+    };
+  }
+
+  if (source.status === 'connected' && source.credential_configured) {
+    return {
+      label: 'Active',
+      color: '#66bb6a',
+      bgColor: 'rgba(46, 125, 50, 0.2)',
+      icon: <CheckCircle sx={{ fontSize: 16 }} />,
+    };
+  }
+
+  if (source.status === 'disconnected' && source.credential_configured) {
+    return {
+      label: 'Error',
+      color: '#f44336',
+      bgColor: 'rgba(211, 47, 47, 0.2)',
+      icon: <Warning sx={{ fontSize: 16 }} />,
+    };
+  }
+
+  if (!source.credential_configured) {
+    return {
+      label: 'Not Configured',
+      color: source.status === 'disconnected' ? '#f44336' : '#9e9e9e',
+      bgColor: source.status === 'disconnected' ? 'rgba(211, 47, 47, 0.2)' : 'rgba(117, 117, 117, 0.2)',
+      icon: source.status === 'disconnected' ? <Warning sx={{ fontSize: 16 }} /> : undefined,
+    };
+  }
+
+  return {
+    label: 'Untested',
+    color: '#9e9e9e',
+    bgColor: 'rgba(117, 117, 117, 0.2)',
+    icon: undefined,
+  };
+}
+
 export function DataSourcesManager() {
-  const [sources, setSources] = useState<DataSourceConfig[]>(initialDataSources);
-  const [saved, setSaved] = useState(false);
+  const [sources, setSources] = useState<DataSource[]>([]);
+  const [scheduleItems, setScheduleItems] = useState<SyncScheduleItem[]>([]);
+  const [enabledChanges, setEnabledChanges] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testingById, setTestingById] = useState<Record<string, boolean>>({});
+  const [updatingScheduleById, setUpdatingScheduleById] = useState<Record<string, boolean>>({});
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleToggle = (index: number) => {
-    const updated = [...sources];
-    updated[index].enabled = !updated[index].enabled;
-    setSources(updated);
+  const loadData = useCallback(async (options?: { signal?: AbortSignal; silent?: boolean }) => {
+    const { signal, silent = false } = options || {};
+    if (!silent) setLoading(true);
+
+    const [sourcesRes, scheduleRes] = await Promise.all([
+      adminApi.getDataSources(50, 0, signal),
+      adminApi.getDataSourceSyncSchedule(signal),
+    ]);
+
+    if (signal?.aborted) return;
+
+    setSources(sourcesRes.data?.items ?? []);
+    setScheduleItems(scheduleRes.data?.items ?? []);
+
+    const firstError = sourcesRes.error || scheduleRes.error;
+    setErrorMessage(firstError ?? null);
+    if (!silent) setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadData({ signal: controller.signal });
+    return () => controller.abort();
+  }, [loadData]);
+
+  const pendingChangesCount = useMemo(
+    () => Object.keys(enabledChanges).length,
+    [enabledChanges],
+  );
+
+  const getEnabledValue = (source: DataSource) => enabledChanges[source.id] ?? source.enabled;
+
+  const handleToggle = (sourceId: string, checked: boolean) => {
+    setEnabledChanges((previous) => {
+      const source = sources.find((item) => item.id === sourceId);
+      if (!source) return previous;
+      if (checked === source.enabled) {
+        const { [sourceId]: _removed, ...rest } = previous;
+        return rest;
+      }
+      return { ...previous, [sourceId]: checked };
+    });
   };
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  const handleSave = async () => {
+    if (pendingChangesCount === 0) return;
+
+    setSaving(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const payload = {
+      sources: Object.entries(enabledChanges).map(([id, enabled]) => ({ id, enabled })),
+    };
+
+    const { data, error } = await adminApi.bulkSaveDataSourceConfiguration(payload);
+    setSaving(false);
+
+    if (error) {
+      setErrorMessage(error);
+      return;
+    }
+
+    setEnabledChanges({});
+    setSuccessMessage(`Configuration saved. Updated ${data?.updated ?? payload.sources.length} source(s).`);
+    await loadData({ silent: true });
   };
 
-  const handleTestConnection = (name: string) => {
-    console.log(`Testing connection to ${name}...`);
+  const handleTestConnection = async (source: DataSource) => {
+    setTestingById((previous) => ({ ...previous, [source.id]: true }));
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const { data, error } = await adminApi.testDataSourceConnection(source.id);
+    setTestingById((previous) => ({ ...previous, [source.id]: false }));
+
+    if (error) {
+      setErrorMessage(error);
+      return;
+    }
+
+    setSuccessMessage(data?.message ? `${source.name}: ${data.message}` : `${source.name} test completed.`);
+    await loadData({ silent: true });
+  };
+
+  const handleScheduleChange = async (source: DataSource, nextValue: DataSourceSyncSchedule) => {
+    setUpdatingScheduleById((previous) => ({ ...previous, [source.id]: true }));
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const { data, error } = await adminApi.updateDataSource(source.id, { sync_schedule: nextValue });
+    setUpdatingScheduleById((previous) => ({ ...previous, [source.id]: false }));
+
+    if (error) {
+      setErrorMessage(error);
+      return;
+    }
+
+    if (data) {
+      setSources((previous) => previous.map((item) => (item.id === source.id ? data : item)));
+      setScheduleItems((previous) =>
+        previous.map((item) =>
+          item.slug === data.slug
+            ? {
+                slug: item.slug,
+                name: data.name,
+                sync_schedule: data.sync_schedule,
+                last_tested_at: data.last_tested_at,
+                enabled: data.enabled,
+              }
+            : item,
+        ),
+      );
+      setSuccessMessage(`${source.name} schedule updated.`);
+    }
   };
 
   return (
@@ -106,10 +235,16 @@ export function DataSourcesManager() {
           Data Source Connectivity
         </Typography>
         <Typography variant="body2" sx={{ color: '#a0a0a0', mb: 3 }}>
-          Visibility into active integrations. Secret keys are no longer entered or stored in frontend UI.
+          Visibility into active integrations.
         </Typography>
 
-        {saved && (
+        {errorMessage && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {errorMessage}
+          </Alert>
+        )}
+
+        {successMessage && (
           <Alert
             severity="success"
             sx={{
@@ -119,156 +254,176 @@ export function DataSourcesManager() {
               border: '1px solid rgba(46, 125, 50, 0.3)',
             }}
           >
-            Configuration saved successfully!
+            {successMessage}
+          </Alert>
+        )}
+
+        {pendingChangesCount > 0 && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            {pendingChangesCount} unsaved source change(s).
           </Alert>
         )}
       </Box>
 
-      <Grid container spacing={3}>
-        {sources.map((source, index) => (
-          <Grid size={{ xs: 12 }} key={source.name}>
-            <Card
-              sx={{
-                bgcolor: '#0a0a0a',
-                border: '1px solid rgba(212, 175, 55, 0.2)',
-                '&:hover': {
-                  borderColor: 'rgba(212, 175, 55, 0.4)',
-                },
-              }}
-            >
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                  <Box sx={{ flex: 1 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                      <Typography variant="h6" sx={{ color: '#D4AF37', fontWeight: 600 }}>
-                        {source.name}
-                      </Typography>
-                      {source.status === 'active' && (
-                        <Chip
-                          icon={<CheckCircle sx={{ fontSize: 16 }} />}
-                          label="Active"
-                          size="small"
-                          sx={{
-                            bgcolor: 'rgba(46, 125, 50, 0.2)',
-                            color: '#66bb6a',
-                            fontWeight: 600,
-                          }}
-                        />
-                      )}
-                      {source.status === 'inactive' && (
-                        <Chip
-                          label="Inactive"
-                          size="small"
-                          sx={{
-                            bgcolor: 'rgba(117, 117, 117, 0.2)',
-                            color: '#9e9e9e',
-                            fontWeight: 600,
-                          }}
-                        />
-                      )}
-                      {source.status === 'error' && (
-                        <Chip
-                          icon={<Warning sx={{ fontSize: 16 }} />}
-                          label="Error"
-                          size="small"
-                          sx={{
-                            bgcolor: 'rgba(211, 47, 47, 0.2)',
-                            color: '#f44336',
-                            fontWeight: 600,
-                          }}
-                        />
-                      )}
-                    </Box>
-                    <Typography variant="body2" sx={{ color: '#a0a0a0', mb: 2 }}>
-                      {source.description}
-                    </Typography>
-                    {source.lastSync && (
-                      <Typography variant="caption" sx={{ color: '#666', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Refresh sx={{ fontSize: 14 }} />
-                        Last synced: {source.lastSync}
-                      </Typography>
-                    )}
-                  </Box>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={source.enabled}
-                        onChange={() => handleToggle(index)}
-                        sx={{
-                          '& .MuiSwitch-switchBase.Mui-checked': {
-                            color: '#D4AF37',
-                          },
-                          '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                            backgroundColor: '#D4AF37',
-                          },
-                        }}
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress sx={{ color: '#D4AF37' }} />
+        </Box>
+      ) : (
+        <Grid container spacing={3}>
+          {sources.map((source) => {
+            const chip = getStatusChip(source);
+            const isEnabled = getEnabledValue(source);
+            return (
+              <Grid size={{ xs: 12 }} key={source.id}>
+                <Card
+                  sx={{
+                    bgcolor: '#0a0a0a',
+                    border: '1px solid rgba(212, 175, 55, 0.2)',
+                    '&:hover': {
+                      borderColor: 'rgba(212, 175, 55, 0.4)',
+                    },
+                  }}
+                >
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                      <Box sx={{ flex: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1, flexWrap: 'wrap' }}>
+                          <Typography variant="h6" sx={{ color: '#D4AF37', fontWeight: 600 }}>
+                            {source.name}
+                          </Typography>
+                          <Chip
+                            icon={chip.icon}
+                            label={chip.label}
+                            size="small"
+                            sx={{
+                              bgcolor: chip.bgColor,
+                              color: chip.color,
+                              fontWeight: 600,
+                            }}
+                          />
+                          <Chip
+                            label={source.category.toUpperCase()}
+                            size="small"
+                            sx={{
+                              bgcolor: 'rgba(212, 175, 55, 0.15)',
+                              color: '#D4AF37',
+                              fontWeight: 600,
+                            }}
+                          />
+                        </Box>
+                        <Typography variant="body2" sx={{ color: '#a0a0a0', mb: 2 }}>
+                          {source.description}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#666', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Refresh sx={{ fontSize: 14 }} />
+                          Last tested: {formatDateTime(source.last_tested_at)}
+                        </Typography>
+                      </Box>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={isEnabled}
+                            onChange={(_, checked) => handleToggle(source.id, checked)}
+                            sx={{
+                              '& .MuiSwitch-switchBase.Mui-checked': {
+                                color: '#D4AF37',
+                              },
+                              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                                backgroundColor: '#D4AF37',
+                              },
+                            }}
+                          />
+                        }
+                        label={isEnabled ? 'Enabled' : 'Disabled'}
+                        sx={{ color: '#a0a0a0' }}
                       />
-                    }
-                    label={source.enabled ? 'Enabled' : 'Disabled'}
-                    sx={{ color: '#a0a0a0' }}
-                  />
-                </Box>
+                    </Box>
 
-                <Divider sx={{ my: 2, borderColor: 'rgba(212, 175, 55, 0.1)' }} />
+                    <Divider sx={{ my: 2, borderColor: 'rgba(212, 175, 55, 0.1)' }} />
 
-                <Grid container spacing={2} alignItems="center">
-                  <Grid size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      label="Endpoint"
-                      value={source.endpoint}
-                      fullWidth
-                      size="small"
-                      InputProps={{
-                        readOnly: true,
-                      }}
-                      sx={{
-                        '& .MuiInputBase-input': {
-                          fontSize: '0.875rem',
-                          color: '#a0a0a0',
-                        },
-                      }}
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 5 }}>
-                    <TextField
-                      label="Credential Handling"
-                      value={source.credentialMode}
-                      fullWidth
-                      size="small"
-                      InputProps={{
-                        readOnly: true,
-                      }}
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 3 }}>
-                    <Button
-                      variant="outlined"
-                      fullWidth
-                      size="small"
-                      onClick={() => handleTestConnection(source.name)}
-                      disabled={!source.enabled}
-                      sx={{
-                        borderColor: '#D4AF37',
-                        color: '#D4AF37',
-                        '&:hover': {
-                          borderColor: '#E5C158',
-                          bgcolor: 'rgba(212, 175, 55, 0.08)',
-                        },
-                        '&.Mui-disabled': {
-                          borderColor: '#333',
-                          color: '#666',
-                        },
-                      }}
-                    >
-                      Test Connection
-                    </Button>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+                    <Grid container spacing={2} alignItems="center">
+                      <Grid size={{ xs: 12, md: 3 }}>
+                        <TextField
+                          label="Endpoint"
+                          value={source.endpoint || 'N/A'}
+                          fullWidth
+                          size="small"
+                          InputProps={{
+                            readOnly: true,
+                          }}
+                          sx={{
+                            '& .MuiInputBase-input': {
+                              fontSize: '0.875rem',
+                              color: '#a0a0a0',
+                            },
+                          }}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 3 }}>
+                        <TextField
+                          label="Credential Handling"
+                          value={getCredentialLabel(source)}
+                          fullWidth
+                          size="small"
+                          InputProps={{
+                            readOnly: true,
+                          }}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 3 }}>
+                        <TextField
+                          select
+                          fullWidth
+                          size="small"
+                          label="Sync Schedule"
+                          value={source.sync_schedule ?? ''}
+                          onChange={(event) =>
+                            void handleScheduleChange(
+                              source,
+                              (event.target.value || null) as DataSourceSyncSchedule,
+                            )
+                          }
+                          disabled={!source.is_implemented || Boolean(updatingScheduleById[source.id])}
+                        >
+                          {SYNC_SCHEDULE_OPTIONS.map((option) => (
+                            <MenuItem key={option.value ?? 'none'} value={option.value ?? ''}>
+                              {option.label}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 3 }}>
+                        <Button
+                          variant="outlined"
+                          fullWidth
+                          size="small"
+                          onClick={() => void handleTestConnection(source)}
+                          disabled={!isEnabled || !source.is_implemented || Boolean(testingById[source.id])}
+                          sx={{
+                            borderColor: '#D4AF37',
+                            color: '#D4AF37',
+                            '&:hover': {
+                              borderColor: '#E5C158',
+                              bgcolor: 'rgba(212, 175, 55, 0.08)',
+                            },
+                            '&.Mui-disabled': {
+                              borderColor: '#333',
+                              color: '#666',
+                            },
+                          }}
+                        >
+                          {testingById[source.id] ? 'Testing...' : 'Test Connection'}
+                        </Button>
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
+              </Grid>
+            );
+          })}
+        </Grid>
+      )}
 
       <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="body2" sx={{ color: '#a0a0a0' }}>
@@ -278,6 +433,7 @@ export function DataSourcesManager() {
           variant="contained"
           startIcon={<Save />}
           onClick={handleSave}
+          disabled={saving || pendingChangesCount === 0}
           sx={{
             bgcolor: '#D4AF37',
             color: '#000000',
@@ -288,7 +444,7 @@ export function DataSourcesManager() {
             },
           }}
         >
-          Save Configuration
+          {saving ? 'Saving...' : 'Save Configuration'}
         </Button>
       </Box>
 
@@ -296,40 +452,24 @@ export function DataSourcesManager() {
         <Typography variant="h6" sx={{ color: '#D4AF37', fontWeight: 600, mb: 2 }}>
           Curated Data Update Schedule
         </Typography>
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Typography variant="body2" sx={{ color: '#ffffff', mb: 0.5 }}>
-              <strong>Tax Incentives:</strong> Quarterly updates
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#a0a0a0' }}>
-              Next update: April 1, 2026
-            </Typography>
+        {scheduleItems.length === 0 ? (
+          <Typography variant="body2" sx={{ color: '#a0a0a0' }}>
+            No schedule data available.
+          </Typography>
+        ) : (
+          <Grid container spacing={2}>
+            {scheduleItems.map((item) => (
+              <Grid size={{ xs: 12, md: 6 }} key={item.slug}>
+                <Typography variant="body2" sx={{ color: '#ffffff', mb: 0.5 }}>
+                  <strong>{item.name}:</strong> {formatScheduleLabel(item.sync_schedule)}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#a0a0a0' }}>
+                  Last tested: {formatDateTime(item.last_tested_at)} • {item.enabled ? 'Enabled' : 'Disabled'}
+                </Typography>
+              </Grid>
+            ))}
           </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Typography variant="body2" sx={{ color: '#ffffff', mb: 0.5 }}>
-              <strong>Crew Rates:</strong> Semi-annual updates
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#a0a0a0' }}>
-              Next update: July 1, 2026
-            </Typography>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Typography variant="body2" sx={{ color: '#ffffff', mb: 0.5 }}>
-              <strong>Comparable Productions:</strong> Monthly TMDB sync
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#a0a0a0' }}>
-              Next sync: March 1, 2026
-            </Typography>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Typography variant="body2" sx={{ color: '#ffffff', mb: 0.5 }}>
-              <strong>Production Facilities:</strong> Annual verification
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#a0a0a0' }}>
-              Next verification: January 2027
-            </Typography>
-          </Grid>
-        </Grid>
+        )}
       </Box>
     </Box>
   );

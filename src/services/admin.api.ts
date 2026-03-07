@@ -25,6 +25,11 @@ import {
   adminFestivalPendingChangeRejectUrl,
   ADMIN_FESTIVALS_SYNC_SETTINGS_URL,
   adminFestivalUrl,
+  ADMIN_DATA_SOURCES_URL,
+  adminDataSourceUrl,
+  adminDataSourceTestUrl,
+  ADMIN_DATA_SOURCES_CONFIGURATION_URL,
+  ADMIN_DATA_SOURCES_SYNC_SCHEDULE_URL,
   ADMIN_INCENTIVES_SYNC_STATUS_URL,
   ADMIN_INCENTIVES_PENDING_CHANGES_URL,
   adminIncentivePendingChangeApproveUrl,
@@ -63,6 +68,12 @@ import type {
   CreditAdjustment,
   CreditAdjustmentResponse,
   TmdbSyncResponse,
+  DataSource,
+  DataSourceUpdate,
+  DataSourceTestResult,
+  DataSourceBulkSavePayload,
+  DataSourceBulkSaveResponse,
+  SyncScheduleResponse,
 } from './admin.types';
 import type { Festival } from '@/app/types/festival';
 
@@ -557,6 +568,70 @@ async function updateFestivalSyncSettings(payload: SyncSettingsUpdate): ApiResul
   }
 }
 
+// ── Data Sources ─────────────────────────────────────────────────────────────
+async function getDataSources(limit = 50, offset = 0, signal?: AbortSignal): ApiResult<PaginatedResponse<DataSource>> {
+  try {
+    const data = await apiClient.get<PaginatedResponse<DataSource>>(
+      `${ADMIN_DATA_SOURCES_URL}${paginationQuery(limit, offset)}`,
+      { auth: true, signal },
+    );
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch data sources' };
+  }
+}
+
+async function getDataSource(sourceId: string, signal?: AbortSignal): ApiResult<DataSource> {
+  try {
+    const data = await apiClient.get<DataSource>(adminDataSourceUrl(sourceId), { auth: true, signal });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch data source' };
+  }
+}
+
+async function updateDataSource(sourceId: string, payload: DataSourceUpdate): ApiResult<DataSource> {
+  try {
+    const data = await apiClient.patch<DataSource>(adminDataSourceUrl(sourceId), payload, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to update data source' };
+  }
+}
+
+async function testDataSourceConnection(sourceId: string): ApiResult<DataSourceTestResult> {
+  try {
+    const data = await apiClient.post<DataSourceTestResult>(adminDataSourceTestUrl(sourceId), {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to test data source connection' };
+  }
+}
+
+async function bulkSaveDataSourceConfiguration(
+  payload: DataSourceBulkSavePayload,
+): ApiResult<DataSourceBulkSaveResponse> {
+  try {
+    const data = await apiClient.put<DataSourceBulkSaveResponse>(
+      ADMIN_DATA_SOURCES_CONFIGURATION_URL,
+      payload,
+      { auth: true },
+    );
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to save data source configuration' };
+  }
+}
+
+async function getDataSourceSyncSchedule(signal?: AbortSignal): ApiResult<SyncScheduleResponse> {
+  try {
+    const data = await apiClient.get<SyncScheduleResponse>(ADMIN_DATA_SOURCES_SYNC_SCHEDULE_URL, { auth: true, signal });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch data source sync schedule' };
+  }
+}
+
 // ── Subscribers ──────────────────────────────────────────────────────────────
 async function getSubscriberMetrics(signal?: AbortSignal): ApiResult<SubscriberMetrics> {
   try {
@@ -671,6 +746,12 @@ export const adminApi = {
   rejectFestivalPendingChange,
   getFestivalSyncSettings,
   updateFestivalSyncSettings,
+  getDataSources,
+  getDataSource,
+  updateDataSource,
+  testDataSourceConnection,
+  bulkSaveDataSourceConfiguration,
+  getDataSourceSyncSchedule,
   getSubscriberMetrics,
   getSubscribers,
   blockSubscriber,

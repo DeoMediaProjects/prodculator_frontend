@@ -191,4 +191,72 @@ export interface CreditAdjustmentResponse {
   credits_remaining: number;
 }
 
+// ── Data Sources ─────────────────────────────────────────────────────────────
+export type DataSourceStatus = 'unknown' | 'connected' | 'disconnected';
+export type DataSourceCredentialMode = 'backend_env' | (string & {});
+export type DataSourceSyncSchedule =
+  | 'on-demand'
+  | 'daily'
+  | 'weekly'
+  | 'monthly'
+  | 'quarterly'
+  | 'semi_annual'
+  | 'annual'
+  | null;
+
+export interface DataSource {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+  description: string;
+  endpoint: string;
+  enabled: boolean;
+  status: DataSourceStatus;
+  credential_mode: DataSourceCredentialMode;
+  credential_configured: boolean;
+  is_implemented: boolean;
+  last_tested_at: string | null;
+  last_test_result: string | null;
+  last_test_message: string | null;
+  sync_schedule: DataSourceSyncSchedule;
+  updated_at: string | null;
+}
+
+export interface DataSourceUpdate {
+  enabled?: boolean;
+  sync_schedule?: DataSourceSyncSchedule;
+}
+
+export interface DataSourceListResponse extends PaginatedResponse<DataSource> {
+}
+
+export interface DataSourceTestResult {
+  slug: string;
+  status: Exclude<DataSourceStatus, 'unknown'>;
+  latency_ms: number;
+  message: string;
+  tested_at: string;
+}
+
+export interface DataSourceBulkSavePayload {
+  sources: { id: string; enabled: boolean }[];
+}
+
+export interface DataSourceBulkSaveResponse {
+  updated: number;
+}
+
+export interface SyncScheduleItem {
+  slug: string;
+  name: string;
+  sync_schedule: DataSourceSyncSchedule;
+  last_tested_at: string | null;
+  enabled: boolean;
+}
+
+export interface SyncScheduleResponse {
+  items: SyncScheduleItem[];
+}
+
 // Festival is defined in src/app/types/festival.ts — import from there directly.

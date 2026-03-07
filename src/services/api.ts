@@ -294,6 +294,12 @@ export const apiClient = {
       method: 'POST',
       data: body,
     }),
+  put: <T>(path: string, body?: unknown, options: RequestOptions = {}) =>
+    request<T>(path, {
+      ...options,
+      method: 'PUT',
+      data: body,
+    }),
   patch: <T>(path: string, body?: unknown, options: RequestOptions = {}) =>
     request<T>(path, {
       ...options,

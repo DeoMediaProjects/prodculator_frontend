@@ -22,6 +22,9 @@ export const ADMIN_FESTIVALS_PENDING_CHANGES_URL = '/api/admin/festivals/pending
 export const adminFestivalPendingChangeApproveUrl = (changeId: string) => `/api/admin/festivals/pending-changes/${changeId}/approve`;
 export const adminFestivalPendingChangeRejectUrl = (changeId: string) => `/api/admin/festivals/pending-changes/${changeId}/reject`;
 export const ADMIN_FESTIVALS_SYNC_SETTINGS_URL = '/api/admin/festivals/sync-settings';
+export const ADMIN_DATA_SOURCES_URL = '/api/admin/data-sources';
+export const ADMIN_DATA_SOURCES_CONFIGURATION_URL = '/api/admin/data-sources/configuration';
+export const ADMIN_DATA_SOURCES_SYNC_SCHEDULE_URL = '/api/admin/data-sources/sync-schedule';
 
 // ── Subscriber endpoints ──────────────────────────────────────────────────────
 export const ADMIN_SUBSCRIBERS_URL = '/api/admin/subscribers';
@@ -36,6 +39,8 @@ export const adminCrewCostUrl   = (id: string) => `/api/admin/crew-costs/${id}`;
 export const adminComparableUrl = (id: string) => `/api/admin/comparables/${id}`;
 export const adminGrantUrl      = (id: string) => `/api/admin/grants/${id}`;
 export const adminFestivalUrl   = (id: string) => `/api/admin/festivals/${id}`;
+export const adminDataSourceUrl = (id: string) => `/api/admin/data-sources/${id}`;
+export const adminDataSourceTestUrl = (id: string) => `/api/admin/data-sources/${id}/test`;
 
 // ── Incentive sync endpoints ─────────────────────────────────────────────────
 export const ADMIN_INCENTIVES_SYNC_STATUS_URL       = '/api/admin/incentives/sync-status';
