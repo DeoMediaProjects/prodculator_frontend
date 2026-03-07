@@ -22,6 +22,13 @@ export const adminFestivalPendingChangeApproveUrl = (changeId: string) => `/api/
 export const adminFestivalPendingChangeRejectUrl = (changeId: string) => `/api/admin/festivals/pending-changes/${changeId}/reject`;
 export const ADMIN_FESTIVALS_SYNC_SETTINGS_URL = '/api/admin/festivals/sync-settings';
 
+// ── Subscriber endpoints ──────────────────────────────────────────────────────
+export const ADMIN_SUBSCRIBERS_URL = '/api/admin/subscribers';
+export const ADMIN_SUBSCRIBERS_METRICS_URL = '/api/admin/subscribers/metrics';
+export const adminSubscriberBlockUrl   = (userId: string) => `/api/admin/subscribers/${userId}/block`;
+export const adminSubscriberUnblockUrl = (userId: string) => `/api/admin/subscribers/${userId}/unblock`;
+export const adminSubscriberCreditUrl  = (userId: string) => `/api/admin/subscribers/${userId}/credit`;
+
 // ── Item endpoints (parameterised) ────────────────────────────────────────────
 export const adminIncentiveUrl  = (id: string) => `/api/admin/incentives/${id}`;
 export const adminCrewCostUrl   = (id: string) => `/api/admin/crew-costs/${id}`;

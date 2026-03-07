@@ -132,4 +132,56 @@ export interface BulkImportResult {
   errors: { row: number; reason: string }[];
 }
 
+// ── Subscribers ──────────────────────────────────────────────────────────────
+export interface SubscriberMetrics {
+  total_paid_users: number;
+  mrr_usd: number;
+  mrr_gbp: number;
+  reports_this_month_total: number;
+  reports_this_month_free: number;
+  reports_this_month_paid: number;
+  avg_reports_per_user: number;
+  plan_distribution: PlanDistributionEntry[];
+}
+
+export interface PlanDistributionEntry {
+  plan: string;
+  user_count: number;
+  revenue: number;
+}
+
+export interface Subscriber {
+  id: string;
+  name: string;
+  email: string;
+  company: string;
+  plan: string;
+  status: string;
+  reports_this_month: number;
+  report_limit: number | null;
+  monthly_spend: number;
+  payment_currency: 'USD' | 'GBP';
+  join_date: string;
+  last_active: string | null;
+  total_reports_generated: number;
+}
+
+export interface SubscriberListResponse extends PaginatedResponse<Subscriber> {
+  counts: {
+    active: number;
+    past_due: number;
+    canceled: number;
+  };
+}
+
+export interface CreditAdjustment {
+  adjustment: number;
+  reason?: string;
+}
+
+export interface CreditAdjustmentResponse {
+  id: string;
+  credits_remaining: number;
+}
+
 // Festival is defined in src/app/types/festival.ts — import from there directly.
