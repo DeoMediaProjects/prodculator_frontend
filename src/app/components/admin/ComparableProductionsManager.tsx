@@ -21,9 +21,9 @@ import {
   Alert,
   CircularProgress,
 } from '@mui/material';
-import { Edit, Add, Refresh } from '@mui/icons-material';
+import { Edit, Add, Refresh, Delete } from '@mui/icons-material';
 import { adminApi } from '@/services/admin.api';
-import type { ComparableProduction } from '@/services/admin.types';
+import type { ComparableProduction, TmdbSyncResponse } from '@/services/admin.types';
 
 const genres = ['Action', 'Drama', 'Comedy', 'Sci-Fi', 'Thriller', 'Horror', 'Adventure', 'Romance'];
 const territories = ['United Kingdom', 'British Columbia', 'Georgia (USA)', 'Malta', 'South Africa'];
@@ -36,6 +36,7 @@ export function ComparableProductionsManager() {
   const [editingProduction, setEditingProduction] = useState<ComparableProduction | null>(null);
   const [formData, setFormData] = useState<Partial<ComparableProduction>>({});
   const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<TmdbSyncResponse | null>(null);
   const didFetch = useRef(false);
 
   useEffect(() => {
@@ -97,10 +98,28 @@ export function ComparableProductionsManager() {
 
   const handleSyncTMDB = async () => {
     setSyncing(true);
-    // Simulate API sync — no TMDB endpoint available yet
-    setTimeout(() => {
-      setSyncing(false);
-    }, 2000);
+    setSyncResult(null);
+    setFetchError(null);
+    const { data, error } = await adminApi.syncComparablesTMDB();
+    if (error) {
+      setFetchError(error);
+    } else if (data) {
+      setSyncResult(data);
+      const refreshed = await adminApi.getComparables();
+      if (refreshed.data) {
+        setProductions(refreshed.data.items);
+      }
+    }
+    setSyncing(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    const { error } = await adminApi.deleteComparable(id);
+    if (error) {
+      setFetchError(error);
+    } else {
+      setProductions(productions.filter(p => p.id !== id));
+    }
   };
 
   return (
@@ -150,7 +169,12 @@ export function ComparableProductionsManager() {
       </Box>
 
       {fetchError && (
-        <Alert severity="error" sx={{ mb: 3 }}>{fetchError}</Alert>
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setFetchError(null)}>{fetchError}</Alert>
+      )}
+      {syncResult && (
+        <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSyncResult(null)}>
+          TMDB sync complete: {syncResult.imported} imported, {syncResult.skipped} skipped, {syncResult.total} total
+        </Alert>
       )}
       {loading && (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -195,15 +219,19 @@ export function ComparableProductionsManager() {
                   </TableCell>
                   <TableCell sx={{ color: '#ffffff' }}>{production.year}</TableCell>
                   <TableCell>
-                    <Chip
-                      label={production.genre}
-                      size="small"
-                      sx={{
-                        bgcolor: 'rgba(212, 175, 55, 0.2)',
-                        color: '#D4AF37',
-                        fontWeight: 600,
-                      }}
-                    />
+                    {(Array.isArray(production.genre) ? production.genre : [production.genre]).map((g) => (
+                      <Chip
+                        key={g}
+                        label={g}
+                        size="small"
+                        sx={{
+                          bgcolor: 'rgba(212, 175, 55, 0.2)',
+                          color: '#D4AF37',
+                          fontWeight: 600,
+                          mr: 0.5,
+                        }}
+                      />
+                    ))}
                   </TableCell>
                   <TableCell sx={{ color: '#ffffff' }}>
                     ${(production.budget / 1000000).toFixed(1)}M
@@ -212,9 +240,12 @@ export function ComparableProductionsManager() {
                   <TableCell sx={{ color: '#a0a0a0', fontSize: '0.875rem' }}>{production.incentiveUsed}</TableCell>
                   <TableCell sx={{ color: '#a0a0a0', fontSize: '0.875rem' }}>{production.source}</TableCell>
                   <TableCell sx={{ color: '#a0a0a0', fontSize: '0.875rem' }}>{production.lastUpdated}</TableCell>
-                  <TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
                     <IconButton size="small" onClick={() => handleEdit(production)}>
                       <Edit sx={{ color: '#D4AF37', fontSize: 18 }} />
+                    </IconButton>
+                    <IconButton size="small" onClick={() => handleDelete(production.id)}>
+                      <Delete sx={{ color: '#f44336', fontSize: 18 }} />
                     </IconButton>
                   </TableCell>
                 </TableRow>
@@ -258,7 +289,7 @@ export function ComparableProductionsManager() {
             <TextField
               select
               label="Genre"
-              value={formData.genre || ''}
+              value={Array.isArray(formData.genre) ? formData.genre[0] ?? '' : formData.genre || ''}
               onChange={(e) => setFormData({ ...formData, genre: e.target.value })}
               fullWidth
             >

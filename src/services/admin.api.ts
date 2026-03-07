@@ -6,6 +6,7 @@ import {
   ADMIN_CREW_COSTS_URL,
   adminCrewCostUrl,
   ADMIN_COMPARABLES_URL,
+  ADMIN_COMPARABLES_SYNC_TMDB_URL,
   adminComparableUrl,
   ADMIN_GRANTS_URL,
   ADMIN_GRANTS_BULK_IMPORT_URL,
@@ -61,6 +62,7 @@ import type {
   SubscriberListResponse,
   CreditAdjustment,
   CreditAdjustmentResponse,
+  TmdbSyncResponse,
 } from './admin.types';
 import type { Festival } from '@/app/types/festival';
 
@@ -326,6 +328,15 @@ async function deleteComparable(id: string): ApiResult<void> {
     return { data: null, error: null };
   } catch (e) {
     return { data: null, error: e instanceof Error ? e.message : 'Failed to delete comparable' };
+  }
+}
+
+async function syncComparablesTMDB(): ApiResult<TmdbSyncResponse> {
+  try {
+    const data = await apiClient.post<TmdbSyncResponse>(ADMIN_COMPARABLES_SYNC_TMDB_URL, {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to sync from TMDB' };
   }
 }
 
@@ -636,6 +647,7 @@ export const adminApi = {
   createComparable,
   updateComparable,
   deleteComparable,
+  syncComparablesTMDB,
   getGrants,
   createGrant,
   updateGrant,

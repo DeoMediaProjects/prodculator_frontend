@@ -91,13 +91,20 @@ export interface ComparableProduction {
   id: string;
   title: string;
   year: number;
-  genre: string;
+  genre: string | string[];
   budget: number;
   territory: string;
   incentiveUsed: string;
   tmdbId?: string;
   source: string;
   lastUpdated: string;
+}
+
+export interface TmdbSyncResponse {
+  message: string;
+  imported: number;
+  skipped: number;
+  total: number;
 }
 
 // ── Grants ────────────────────────────────────────────────────────────────────
