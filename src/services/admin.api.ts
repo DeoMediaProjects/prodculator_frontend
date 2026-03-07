@@ -36,6 +36,11 @@ import {
   adminCrewCostPendingChangeRejectUrl,
   ADMIN_CREW_COSTS_SYNC_URL,
   ADMIN_CREW_COSTS_SYNC_SETTINGS_URL,
+  ADMIN_SUBSCRIBERS_URL,
+  ADMIN_SUBSCRIBERS_METRICS_URL,
+  adminSubscriberBlockUrl,
+  adminSubscriberUnblockUrl,
+  adminSubscriberCreditUrl,
 } from './admin.apiurl';
 import type {
   AdminMetrics,
@@ -51,6 +56,11 @@ import type {
   SyncSettings,
   SyncSettingsUpdate,
   SyncTriggerResponse,
+  SubscriberMetrics,
+  Subscriber,
+  SubscriberListResponse,
+  CreditAdjustment,
+  CreditAdjustmentResponse,
 } from './admin.types';
 import type { Festival } from '@/app/types/festival';
 
@@ -536,6 +546,67 @@ async function updateFestivalSyncSettings(payload: SyncSettingsUpdate): ApiResul
   }
 }
 
+// ── Subscribers ──────────────────────────────────────────────────────────────
+async function getSubscriberMetrics(signal?: AbortSignal): ApiResult<SubscriberMetrics> {
+  try {
+    const data = await apiClient.get<SubscriberMetrics>(ADMIN_SUBSCRIBERS_METRICS_URL, { auth: true, signal });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch subscriber metrics' };
+  }
+}
+
+interface SubscriberListParams {
+  status?: 'active' | 'past_due' | 'canceled';
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+async function getSubscribers(params: SubscriberListParams = {}, signal?: AbortSignal): ApiResult<SubscriberListResponse> {
+  try {
+    const query = new URLSearchParams();
+    if (params.status) query.set('status', params.status);
+    if (params.search) query.set('search', params.search);
+    query.set('limit', String(params.limit ?? 25));
+    query.set('offset', String(params.offset ?? 0));
+    const data = await apiClient.get<SubscriberListResponse>(
+      `${ADMIN_SUBSCRIBERS_URL}?${query.toString()}`,
+      { auth: true, signal },
+    );
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch subscribers' };
+  }
+}
+
+async function blockSubscriber(userId: string): ApiResult<{ success: boolean; message: string }> {
+  try {
+    const data = await apiClient.post<{ success: boolean; message: string }>(adminSubscriberBlockUrl(userId), {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to block subscriber' };
+  }
+}
+
+async function unblockSubscriber(userId: string): ApiResult<{ success: boolean; message: string }> {
+  try {
+    const data = await apiClient.post<{ success: boolean; message: string }>(adminSubscriberUnblockUrl(userId), {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to unblock subscriber' };
+  }
+}
+
+async function creditSubscriber(userId: string, payload: CreditAdjustment): ApiResult<CreditAdjustmentResponse> {
+  try {
+    const data = await apiClient.post<CreditAdjustmentResponse>(adminSubscriberCreditUrl(userId), payload, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to adjust subscriber credits' };
+  }
+}
+
 // ── Named export ──────────────────────────────────────────────────────────────
 export const adminApi = {
   getMetrics,
@@ -588,4 +659,9 @@ export const adminApi = {
   rejectFestivalPendingChange,
   getFestivalSyncSettings,
   updateFestivalSyncSettings,
+  getSubscriberMetrics,
+  getSubscribers,
+  blockSubscriber,
+  unblockSubscriber,
+  creditSubscriber,
 };

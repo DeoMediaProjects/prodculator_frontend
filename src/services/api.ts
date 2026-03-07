@@ -211,6 +211,10 @@ axiosClient.interceptors.response.use(
       clearTokens();
     }
 
+    if (axios.isCancel(error)) {
+      return Promise.reject(error);
+    }
+
     logError(method, url, originalRequest.data, {
       status: error.response?.status,
       data: error.response?.data,
