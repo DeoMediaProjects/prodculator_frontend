@@ -259,4 +259,13 @@ export interface SyncScheduleResponse {
   items: SyncScheduleItem[];
 }
 
+// ── Email Gating ─────────────────────────────────────────────────────────────
+export interface EmailGatingRecord {
+  id: string;
+  email: string;
+  date: string;
+  report_generated: boolean;
+  blocked: boolean;
+}
+
 // Festival is defined in src/app/types/festival.ts — import from there directly.

@@ -50,6 +50,11 @@ export const adminIncentivePendingChangeRejectUrl    = (changeId: string) => `/a
 export const ADMIN_INCENTIVES_SYNC_URL               = '/api/admin/incentives/sync';
 export const ADMIN_INCENTIVES_SYNC_SETTINGS_URL      = '/api/admin/incentives/sync-settings';
 
+// ── Email gating endpoints ──────────────────────────────────────────────────
+export const ADMIN_EMAIL_GATING_URL = '/api/admin/email-gating';
+export const adminEmailGatingBlockUrl   = (recordId: string) => `/api/admin/email-gating/${recordId}/block`;
+export const adminEmailGatingUnblockUrl = (recordId: string) => `/api/admin/email-gating/${recordId}/unblock`;
+
 // ── Crew costs sync endpoints ────────────────────────────────────────────────
 export const ADMIN_CREW_COSTS_SYNC_STATUS_URL        = '/api/admin/crew-costs/sync-status';
 export const ADMIN_CREW_COSTS_PENDING_CHANGES_URL    = '/api/admin/crew-costs/pending-changes';

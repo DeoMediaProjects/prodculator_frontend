@@ -47,6 +47,9 @@ import {
   adminSubscriberBlockUrl,
   adminSubscriberUnblockUrl,
   adminSubscriberCreditUrl,
+  ADMIN_EMAIL_GATING_URL,
+  adminEmailGatingBlockUrl,
+  adminEmailGatingUnblockUrl,
 } from './admin.apiurl';
 import type {
   AdminMetrics,
@@ -74,6 +77,7 @@ import type {
   DataSourceBulkSavePayload,
   DataSourceBulkSaveResponse,
   SyncScheduleResponse,
+  EmailGatingRecord,
 } from './admin.types';
 import type { Festival } from '@/app/types/festival';
 
@@ -693,6 +697,44 @@ async function creditSubscriber(userId: string, payload: CreditAdjustment): ApiR
   }
 }
 
+// ── Email Gating ─────────────────────────────────────────────────────────────
+async function getEmailGatingRecords(
+  params: { limit?: number; offset?: number; search?: string } = {},
+  signal?: AbortSignal,
+): ApiResult<PaginatedResponse<EmailGatingRecord>> {
+  try {
+    const query = new URLSearchParams();
+    query.set('limit', String(params.limit ?? 50));
+    query.set('offset', String(params.offset ?? 0));
+    if (params.search) query.set('search', params.search);
+    const data = await apiClient.get<PaginatedResponse<EmailGatingRecord>>(
+      `${ADMIN_EMAIL_GATING_URL}?${query.toString()}`,
+      { auth: true, signal },
+    );
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch email gating records' };
+  }
+}
+
+async function blockEmailGatingRecord(recordId: string): ApiResult<EmailGatingRecord> {
+  try {
+    const data = await apiClient.post<EmailGatingRecord>(adminEmailGatingBlockUrl(recordId), {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to block email' };
+  }
+}
+
+async function unblockEmailGatingRecord(recordId: string): ApiResult<EmailGatingRecord> {
+  try {
+    const data = await apiClient.post<EmailGatingRecord>(adminEmailGatingUnblockUrl(recordId), {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to unblock email' };
+  }
+}
+
 // ── Named export ──────────────────────────────────────────────────────────────
 export const adminApi = {
   getMetrics,
@@ -757,4 +799,7 @@ export const adminApi = {
   blockSubscriber,
   unblockSubscriber,
   creditSubscriber,
+  getEmailGatingRecords,
+  blockEmailGatingRecord,
+  unblockEmailGatingRecord,
 };
