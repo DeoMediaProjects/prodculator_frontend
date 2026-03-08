@@ -287,4 +287,34 @@ export interface ResendReportResponse {
   message: string;
 }
 
+// ── Admin User Management ────────────────────────────────────────────────────
+export type AdminRoleValue = 'master_admin' | 'senior_admin' | 'data_admin' | 'support_admin';
+
+export interface AdminUserRecord {
+  id: string;
+  email: string;
+  name: string;
+  role: AdminRoleValue;
+  last_login: string | null;
+  created_at: string;
+}
+
+export interface CreateAdminPayload {
+  email: string;
+  name?: string;
+  role: AdminRoleValue;
+}
+
+export interface CreateAdminResponse {
+  admin: AdminUserRecord;
+  temporary_password: string;
+}
+
+export interface UpdateAdminPayload {
+  name?: string;
+  email?: string;
+  role?: AdminRoleValue;
+  password?: string;
+}
+
 // Festival is defined in src/app/types/festival.ts — import from there directly.

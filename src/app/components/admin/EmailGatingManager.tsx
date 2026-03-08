@@ -23,8 +23,10 @@ import {
   Search,
   LockOpen,
 } from '@mui/icons-material';
+import { useAuth } from '@/app/contexts/AuthContext';
 import { adminApi } from '@/services/admin.api';
 import type { EmailGatingRecord } from '@/services/admin.types';
+import { AdminAccessDenied } from './AdminAccessDenied';
 
 function formatDateTime(date: string) {
   try {
@@ -41,6 +43,21 @@ function formatDateTime(date: string) {
 }
 
 export function EmailGatingManager() {
+  const { hasAdminPermission } = useAuth();
+
+  if (!hasAdminPermission('canManageEmailGating')) {
+    return (
+      <AdminAccessDenied
+        requiredPermission="Manage Email Gating"
+        requiredRole="Master Admin, Senior Admin, or Support Admin"
+      />
+    );
+  }
+
+  return <EmailGatingManagerContent />;
+}
+
+function EmailGatingManagerContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [records, setRecords] = useState<EmailGatingRecord[]>([]);
   const [total, setTotal] = useState(0);

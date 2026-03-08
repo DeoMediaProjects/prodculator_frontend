@@ -1,5 +1,7 @@
 import { apiClient } from './api';
 import {
+  ADMIN_ADMIN_USERS_URL,
+  adminAdminUserUrl,
   ADMIN_METRICS_URL,
   ADMIN_INCENTIVES_URL,
   adminIncentiveUrl,
@@ -85,6 +87,10 @@ import type {
   PdfReport,
   PdfReportPreviewResponse,
   ResendReportResponse,
+  AdminUserRecord,
+  CreateAdminPayload,
+  CreateAdminResponse,
+  UpdateAdminPayload,
 } from './admin.types';
 import type { Festival } from '@/app/types/festival';
 
@@ -787,8 +793,52 @@ async function resendPdfReport(reportId: string, email?: string): ApiResult<Rese
   }
 }
 
+// ── Admin Users ──────────────────────────────────────────────────────────────
+async function getAdminUsers(limit = 50, offset = 0, signal?: AbortSignal): ApiResult<PaginatedResponse<AdminUserRecord>> {
+  try {
+    const data = await apiClient.get<PaginatedResponse<AdminUserRecord>>(
+      `${ADMIN_ADMIN_USERS_URL}${paginationQuery(limit, offset)}`,
+      { auth: true, signal },
+    );
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch admin users' };
+  }
+}
+
+async function createAdminUser(payload: CreateAdminPayload): ApiResult<CreateAdminResponse> {
+  try {
+    const data = await apiClient.post<CreateAdminResponse>(ADMIN_ADMIN_USERS_URL, payload, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to create admin user' };
+  }
+}
+
+async function updateAdminUser(id: string, payload: UpdateAdminPayload): ApiResult<AdminUserRecord> {
+  try {
+    const data = await apiClient.put<AdminUserRecord>(adminAdminUserUrl(id), payload, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to update admin user' };
+  }
+}
+
+async function deleteAdminUser(id: string): ApiResult<void> {
+  try {
+    await apiClient.delete(adminAdminUserUrl(id), { auth: true });
+    return { data: null, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to delete admin user' };
+  }
+}
+
 // ── Named export ──────────────────────────────────────────────────────────────
 export const adminApi = {
+  getAdminUsers,
+  createAdminUser,
+  updateAdminUser,
+  deleteAdminUser,
   getMetrics,
   getIncentives,
   createIncentive,

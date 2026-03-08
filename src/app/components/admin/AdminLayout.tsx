@@ -32,7 +32,7 @@ import {
   BusinessCenter,
   Videocam,
 } from '@mui/icons-material';
-import { useAuth } from '@/app/contexts/AuthContext';
+import { useAuth, type AdminPermissions } from '@/app/contexts/AuthContext';
 import { LoadingSpinner } from '@/app/components/common/LoadingSpinner';
 
 const drawerWidth = 240;
@@ -40,26 +40,27 @@ const drawerWidth = 240;
 export function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { adminLogout } = useAuth();
+  const { adminLogout, hasAdminPermission } = useAuth();
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const menuItems = [
+  const menuItems: { label: string; path: string; icon: JSX.Element; permission?: keyof AdminPermissions }[] = [
     { label: 'Overview', path: '/admin/overview', icon: <Dashboard /> },
-    { label: 'Business Metrics', path: '/admin/metrics', icon: <TrendingUp /> },
+    { label: 'Business Metrics', path: '/admin/metrics', icon: <TrendingUp />, permission: 'canViewBusinessMetrics' },
     { label: 'B2B Clients', path: '/admin/b2b-clients', icon: <BusinessCenter /> },
-    { label: 'Production Intelligence', path: '/admin/production-intel', icon: <Videocam /> },
+    { label: 'Production Intelligence', path: '/admin/production-intel', icon: <Videocam />, permission: 'canViewPlatformEconomics' },
     { label: 'Script AI Overview', path: '/admin/script-ai', icon: <AccountCircle /> },
-    { label: 'Incentive Data', path: '/admin/incentives', icon: <AttachMoney /> },
-    { label: 'Grants Manager', path: '/admin/grants', icon: <MonetizationOn /> },
-    { label: 'Festivals Manager', path: '/admin/festivals', icon: <EmojiEvents /> },
-    { label: 'Crew Costs', path: '/admin/crew-costs', icon: <People /> },
-    { label: 'Comparable Productions', path: '/admin/comparables', icon: <Movie /> },
-    { label: 'API & Data Sources', path: '/admin/data-sources', icon: <Settings /> },
-    { label: 'Email Gating', path: '/admin/email-gating', icon: <Email /> },
-    { label: 'PDF Reports', path: '/admin/pdf-reports', icon: <Description /> },
-    { label: 'User Management', path: '/admin/users', icon: <SupervisorAccount /> },
+    { label: 'Incentive Data', path: '/admin/incentives', icon: <AttachMoney />, permission: 'canEditIncentiveData' },
+    { label: 'Grants Manager', path: '/admin/grants', icon: <MonetizationOn />, permission: 'canEditIncentiveData' },
+    { label: 'Festivals Manager', path: '/admin/festivals', icon: <EmojiEvents />, permission: 'canEditIncentiveData' },
+    { label: 'Crew Costs', path: '/admin/crew-costs', icon: <People />, permission: 'canEditCrewCosts' },
+    { label: 'Comparable Productions', path: '/admin/comparables', icon: <Movie />, permission: 'canEditComparables' },
+    { label: 'API & Data Sources', path: '/admin/data-sources', icon: <Settings />, permission: 'canManageDataSources' },
+    { label: 'Email Gating', path: '/admin/email-gating', icon: <Email />, permission: 'canManageEmailGating' },
+    { label: 'PDF Reports', path: '/admin/pdf-reports', icon: <Description />, permission: 'canManagePDFReports' },
+    { label: 'User Management', path: '/admin/users', icon: <SupervisorAccount />, permission: 'canManageAdmins' },
   ];
+  const visibleMenuItems = menuItems.filter((item) => !item.permission || hasAdminPermission(item.permission));
 
   const handleLogout = async () => {
     if (loggingOut) return;
@@ -97,7 +98,7 @@ export function AdminLayout() {
         <Toolbar />
         <Box sx={{ overflow: 'auto', mt: 2 }}>
           <List>
-            {menuItems.map((item) => (
+            {visibleMenuItems.map((item) => (
               <ListItem key={item.path} disablePadding>
                 <ListItemButton
                   selected={location.pathname === item.path}

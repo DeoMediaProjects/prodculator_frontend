@@ -16,8 +16,10 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { Save, CheckCircle, Warning, Refresh, Schedule } from '@mui/icons-material';
+import { useAuth } from '@/app/contexts/AuthContext';
 import { adminApi } from '@/services/admin.api';
 import type { DataSource, DataSourceSyncSchedule, SyncScheduleItem } from '@/services/admin.types';
+import { AdminAccessDenied } from './AdminAccessDenied';
 
 const SYNC_SCHEDULE_OPTIONS: { value: DataSourceSyncSchedule; label: string }[] = [
   { value: 'on-demand', label: 'On demand' },
@@ -101,6 +103,21 @@ function getStatusChip(source: DataSource) {
 }
 
 export function DataSourcesManager() {
+  const { hasAdminPermission } = useAuth();
+
+  if (!hasAdminPermission('canManageDataSources')) {
+    return (
+      <AdminAccessDenied
+        requiredPermission="Manage Data Sources"
+        requiredRole="Master Admin or Senior Admin"
+      />
+    );
+  }
+
+  return <DataSourcesManagerContent />;
+}
+
+function DataSourcesManagerContent() {
   const [sources, setSources] = useState<DataSource[]>([]);
   const [scheduleItems, setScheduleItems] = useState<SyncScheduleItem[]>([]);
   const [enabledChanges, setEnabledChanges] = useState<Record<string, boolean>>({});

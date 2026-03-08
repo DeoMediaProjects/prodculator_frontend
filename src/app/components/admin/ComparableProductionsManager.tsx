@@ -22,13 +22,30 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { Edit, Add, Refresh, Delete } from '@mui/icons-material';
+import { useAuth } from '@/app/contexts/AuthContext';
 import { adminApi } from '@/services/admin.api';
 import type { ComparableProduction, TmdbSyncResponse } from '@/services/admin.types';
+import { AdminAccessDenied } from './AdminAccessDenied';
 
 const genres = ['Action', 'Drama', 'Comedy', 'Sci-Fi', 'Thriller', 'Horror', 'Adventure', 'Romance'];
 const territories = ['United Kingdom', 'British Columbia', 'Georgia (USA)', 'Malta', 'South Africa'];
 
 export function ComparableProductionsManager() {
+  const { hasAdminPermission } = useAuth();
+
+  if (!hasAdminPermission('canEditComparables')) {
+    return (
+      <AdminAccessDenied
+        requiredPermission="Edit Comparable Productions"
+        requiredRole="Master Admin, Senior Admin, or Data Admin"
+      />
+    );
+  }
+
+  return <ComparableProductionsManagerContent />;
+}
+
+function ComparableProductionsManagerContent() {
   const [productions, setProductions] = useState<ComparableProduction[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);

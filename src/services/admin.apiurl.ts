@@ -1,3 +1,7 @@
+// ── Admin user management endpoints ─────────────────────────────────────────
+export const ADMIN_ADMIN_USERS_URL = '/api/admin/admin-users';
+export const adminAdminUserUrl = (id: string) => `/api/admin/admin-users/${id}`;
+
 // ── Collection endpoints ───────────────────────────────────────────────────────
 export const ADMIN_USERS_URL = '/api/admin/users';
 export const ADMIN_REPORTS_URL = '/api/admin/reports';

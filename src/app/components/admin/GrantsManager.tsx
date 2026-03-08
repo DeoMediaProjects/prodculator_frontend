@@ -50,6 +50,7 @@ import {
   ExpandLess,
   MonetizationOn,
 } from '@mui/icons-material';
+import { useAuth } from '@/app/contexts/AuthContext';
 import { adminApi } from '@/services/admin.api';
 import type {
   Grant,
@@ -60,6 +61,7 @@ import type {
   SyncSettings,
   SyncSettingsUpdate,
 } from '@/services/admin.types';
+import { AdminAccessDenied } from './AdminAccessDenied';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -113,6 +115,21 @@ function normalizeGrant(raw: any): Grant {
 }
 
 export function GrantsManager() {
+  const { hasAdminPermission } = useAuth();
+
+  if (!hasAdminPermission('canEditIncentiveData')) {
+    return (
+      <AdminAccessDenied
+        requiredPermission="Edit Incentive Data"
+        requiredRole="Master Admin, Senior Admin, or Data Admin"
+      />
+    );
+  }
+
+  return <GrantsManagerContent />;
+}
+
+function GrantsManagerContent() {
   const [currentTab, setCurrentTab] = useState(0);
   const [grants, setGrants] = useState<Grant[]>([]);
   const [loading, setLoading] = useState(true);

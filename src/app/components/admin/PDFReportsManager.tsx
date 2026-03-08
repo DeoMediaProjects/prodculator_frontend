@@ -21,10 +21,27 @@ import {
   Visibility,
   Send,
 } from '@mui/icons-material';
+import { useAuth } from '@/app/contexts/AuthContext';
 import { adminApi } from '@/services/admin.api';
 import type { PdfReport } from '@/services/admin.types';
+import { AdminAccessDenied } from './AdminAccessDenied';
 
 export function PDFReportsManager() {
+  const { hasAdminPermission } = useAuth();
+
+  if (!hasAdminPermission('canManagePDFReports')) {
+    return (
+      <AdminAccessDenied
+        requiredPermission="Manage PDF Reports"
+        requiredRole="Master Admin, Senior Admin, or Support Admin"
+      />
+    );
+  }
+
+  return <PDFReportsManagerContent />;
+}
+
+function PDFReportsManagerContent() {
   const [reports, setReports] = useState<PdfReport[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);

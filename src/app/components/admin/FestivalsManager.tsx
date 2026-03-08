@@ -49,9 +49,11 @@ import {
   Movie,
   EmojiEvents,
 } from '@mui/icons-material';
+import { useAuth } from '@/app/contexts/AuthContext';
 import { Festival, FestivalDeadline } from '@/app/types/festival';
 import { adminApi } from '@/services/admin.api';
 import type { PendingChange, SyncStatus, SyncSettings, SyncSettingsUpdate } from '@/services/admin.types';
+import { AdminAccessDenied } from './AdminAccessDenied';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -68,6 +70,21 @@ function TabPanel({ children, value, index }: TabPanelProps) {
 }
 
 export function FestivalsManager() {
+  const { hasAdminPermission } = useAuth();
+
+  if (!hasAdminPermission('canEditIncentiveData')) {
+    return (
+      <AdminAccessDenied
+        requiredPermission="Edit Incentive Data"
+        requiredRole="Master Admin, Senior Admin, or Data Admin"
+      />
+    );
+  }
+
+  return <FestivalsManagerContent />;
+}
+
+function FestivalsManagerContent() {
   const [currentTab, setCurrentTab] = useState(0);
   const [festivals, setFestivals] = useState<Festival[]>([]);
   const [loading, setLoading] = useState(true);
