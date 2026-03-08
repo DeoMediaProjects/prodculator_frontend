@@ -268,4 +268,23 @@ export interface EmailGatingRecord {
   blocked: boolean;
 }
 
+// ── PDF Reports ──────────────────────────────────────────────────────────────
+export interface PdfReport {
+  id: string;
+  title: string;
+  email: string;
+  generated: string;
+  downloaded: boolean;
+  size: string;
+}
+
+export interface PdfReportPreviewResponse {
+  url: string;
+}
+
+export interface ResendReportResponse {
+  success: boolean;
+  message: string;
+}
+
 // Festival is defined in src/app/types/festival.ts — import from there directly.

@@ -50,6 +50,10 @@ import {
   ADMIN_EMAIL_GATING_URL,
   adminEmailGatingBlockUrl,
   adminEmailGatingUnblockUrl,
+  ADMIN_PDF_REPORTS_URL,
+  adminPdfReportPreviewUrl,
+  adminPdfReportDownloadUrl,
+  adminPdfReportResendUrl,
 } from './admin.apiurl';
 import type {
   AdminMetrics,
@@ -78,6 +82,9 @@ import type {
   DataSourceBulkSaveResponse,
   SyncScheduleResponse,
   EmailGatingRecord,
+  PdfReport,
+  PdfReportPreviewResponse,
+  ResendReportResponse,
 } from './admin.types';
 import type { Festival } from '@/app/types/festival';
 
@@ -735,6 +742,51 @@ async function unblockEmailGatingRecord(recordId: string): ApiResult<EmailGating
   }
 }
 
+// ── PDF Reports ──────────────────────────────────────────────────────────────
+async function getPdfReports(limit = 25, offset = 0, signal?: AbortSignal): ApiResult<PaginatedResponse<PdfReport>> {
+  try {
+    const data = await apiClient.get<PaginatedResponse<PdfReport>>(
+      `${ADMIN_PDF_REPORTS_URL}${paginationQuery(limit, offset)}`,
+      { auth: true, signal },
+    );
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch PDF reports' };
+  }
+}
+
+async function getPdfReportPreviewUrl(reportId: string): ApiResult<PdfReportPreviewResponse> {
+  try {
+    const data = await apiClient.get<PdfReportPreviewResponse>(adminPdfReportPreviewUrl(reportId), { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to get report preview' };
+  }
+}
+
+async function downloadPdfReport(reportId: string): ApiResult<Blob> {
+  try {
+    const data = await apiClient.get<Blob>(adminPdfReportDownloadUrl(reportId), {
+      auth: true,
+      responseType: 'blob',
+    });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to download report' };
+  }
+}
+
+async function resendPdfReport(reportId: string, email?: string): ApiResult<ResendReportResponse> {
+  try {
+    const payload: Record<string, string> = {};
+    if (email) payload.email = email;
+    const data = await apiClient.post<ResendReportResponse>(adminPdfReportResendUrl(reportId), { payload }, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to re-send report' };
+  }
+}
+
 // ── Named export ──────────────────────────────────────────────────────────────
 export const adminApi = {
   getMetrics,
@@ -802,4 +854,8 @@ export const adminApi = {
   getEmailGatingRecords,
   blockEmailGatingRecord,
   unblockEmailGatingRecord,
+  getPdfReports,
+  getPdfReportPreviewUrl,
+  downloadPdfReport,
+  resendPdfReport,
 };

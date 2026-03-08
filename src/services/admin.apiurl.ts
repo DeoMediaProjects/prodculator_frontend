@@ -55,6 +55,12 @@ export const ADMIN_EMAIL_GATING_URL = '/api/admin/email-gating';
 export const adminEmailGatingBlockUrl   = (recordId: string) => `/api/admin/email-gating/${recordId}/block`;
 export const adminEmailGatingUnblockUrl = (recordId: string) => `/api/admin/email-gating/${recordId}/unblock`;
 
+// ── PDF report endpoints ─────────────────────────────────────────────────────
+export const ADMIN_PDF_REPORTS_URL = '/api/admin/pdf-reports';
+export const adminPdfReportPreviewUrl = (id: string) => `/api/admin/pdf-reports/${id}/preview`;
+export const adminPdfReportDownloadUrl = (id: string) => `/api/admin/pdf-reports/${id}/download`;
+export const adminPdfReportResendUrl = (id: string) => `/api/admin/pdf-reports/${id}/resend`;
+
 // ── Crew costs sync endpoints ────────────────────────────────────────────────
 export const ADMIN_CREW_COSTS_SYNC_STATUS_URL        = '/api/admin/crew-costs/sync-status';
 export const ADMIN_CREW_COSTS_PENDING_CHANGES_URL    = '/api/admin/crew-costs/pending-changes';
