@@ -37,7 +37,7 @@ import {
   Info,
   Lock,
 } from '@mui/icons-material';
-import { useScript } from '@/app/contexts/ScriptContext';
+import { useScript, mapReportToAnalysis } from '@/app/contexts/ScriptContext';
 import { generateReportPDF, downloadReportPDF, viewReportPDF } from '@/services/report-pdf.service';
 import { apiClient } from '@/services/api';
 import exampleLogo from '@/assets/2ac5b205356b38916f5ff32008dfa103d8ffc2cb.png';
@@ -50,11 +50,13 @@ export function ReportViewer() {
   const navigate = useNavigate();
   const location = useLocation();
   const { reportId } = useParams<{ reportId: string }>();
-  const { analysis } = useScript();
+  const { analysis, setAnalysis } = useScript();
   const [tabValue, setTabValue] = useState(0);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [isFetchingReport, setIsFetchingReport] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const isPreview = location.pathname.includes('preview');
 
@@ -64,9 +66,51 @@ export function ReportViewer() {
 
   useEffect(() => {
     if (!reportId) return;
-    apiClient.get<{ pdf_url?: string; pdfUrl?: string }>(`/api/reports/${reportId}`, { auth: true })
-      .then((report) => setPdfUrl(report.pdf_url || report.pdfUrl || null))
-      .catch(() => { /* pdfUrl stays null — fallback to print */ });
+
+    setIsFetchingReport(true);
+    setFetchError(null);
+
+    apiClient
+      .get<any>(`/api/reports/${reportId}`, { auth: true })
+      .then((report) => {
+        // Always capture the pdf url
+        setPdfUrl(report.pdf_url || report.pdfUrl || null);
+
+        // If analysis is already in context (same-session), don't overwrite it
+        if (analysis) return;
+
+        // Try to use the pre-shaped analysis field first (backend may already return it)
+        const analysisData = report.analysis || report.report_data;
+        if (analysisData?.locationRankings) {
+          setAnalysis({
+            ...analysisData,
+            id: report.id,
+            scriptTitle: analysisData.scriptTitle || report.script_title || report.title || 'Untitled',
+            generatedAt: analysisData.generatedAt || report.completed_at || report.created_at || new Date().toISOString(),
+          });
+        } else if (analysisData) {
+          // Raw backend shape — run through the mapper with minimal metadata derived from the report
+          const metadata = {
+            title: report.script_title || report.title || 'Untitled',
+            genre: report.genre ? (Array.isArray(report.genre) ? report.genre : [report.genre]) : [],
+            budget: report.budget_range || '',
+            format: report.format || '',
+            country: report.country || '',
+            locationStrategy: report.location_strategy || '',
+            productionPriority: report.production_priority || '',
+          };
+          setAnalysis(mapReportToAnalysis(report, metadata));
+        } else {
+          setFetchError('This report is still processing or contains no data yet.');
+        }
+      })
+      .catch(() => {
+        setFetchError('Failed to load report. Please try again.');
+      })
+      .finally(() => {
+        setIsFetchingReport(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reportId]);
 
   const handleDownloadPDF = async () => {
@@ -107,12 +151,28 @@ export function ReportViewer() {
     }
   };
 
+  if (isFetchingReport || (!analysis && !fetchError)) {
+    return (
+      <Box sx={{ bgcolor: '#000000', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress sx={{ color: '#D4AF37', mb: 2 }} />
+          <Typography variant="body1" sx={{ color: '#a0a0a0' }}>Loading report…</Typography>
+        </Box>
+      </Box>
+    );
+  }
+
   if (!analysis) {
     return (
       <Box sx={{ bgcolor: '#000000', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Container maxWidth="md" sx={{ textAlign: 'center' }}>
-          <Typography variant="h5" gutterBottom sx={{ color: '#ffffff' }}>No report data found</Typography>
-          <Button variant="contained" onClick={() => navigate('/upload')}>Go to Upload</Button>
+          <Typography variant="h5" gutterBottom sx={{ color: '#ffffff' }}>
+            {fetchError || 'No report data found'}
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 2 }}>
+            <Button variant="outlined" onClick={() => navigate('/dashboard')}>Back to Dashboard</Button>
+            <Button variant="contained" onClick={() => navigate('/upload')}>New Analysis</Button>
+          </Box>
         </Container>
       </Box>
     );
@@ -245,7 +305,7 @@ export function ReportViewer() {
           <Box sx={{ borderBottom: 1, borderColor: 'rgba(212, 175, 55, 0.2)' }}>
             <Tabs 
               value={tabValue} 
-              onChange={(e, v) => setTabValue(v)} 
+              onChange={(_e, v) => setTabValue(v)} 
               variant="scrollable" 
               sx={{
                 '& .MuiTab-root': { color: '#a0a0a0', py: 2 },
