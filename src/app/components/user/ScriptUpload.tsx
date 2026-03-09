@@ -27,8 +27,12 @@ import {
   CloudUpload,
   CheckCircle,
   ArrowBack,
+  HourglassEmpty,
+  Email,
+  Dashboard,
 } from '@mui/icons-material';
 import { useScript, ScriptMetadata } from '@/app/contexts/ScriptContext';
+import { ReportTimeoutError } from '@/app/contexts/ScriptContext';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { InfoTip, TOOLTIP_TEXTS } from '@/app/components/common/InfoTip';
 import exampleLogo from '@/assets/2ac5b205356b38916f5ff32008dfa103d8ffc2cb.png';
@@ -57,6 +61,10 @@ export function ScriptUpload() {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+
+  // Timeout modal — shown when report generation is still running after the polling window
+  const [timeoutModalOpen, setTimeoutModalOpen] = useState(false);
+  const [_timedOutReportId, setTimedOutReportId] = useState<string | null>(null);
 
   const [targetAudience, setTargetAudience] = useState('');
   const [language, setLanguage] = useState('');
@@ -202,7 +210,12 @@ export function ScriptUpload() {
       await generateAnalysis(file!, metadata);
       navigate('/report/full');
     } catch (err: any) {
-      setError(err.message || 'Failed to generate report. Please try again.');
+      if (err instanceof ReportTimeoutError) {
+        setTimedOutReportId(err.reportId);
+        setTimeoutModalOpen(true);
+      } else {
+        setError(err.message || 'Failed to generate report. Please try again.');
+      }
       setProcessing(false);
     }
   };
@@ -791,6 +804,95 @@ export function ScriptUpload() {
         <DialogActions sx={{ p: 3 }}>
           <Button onClick={() => setEmailModalOpen(false)} sx={{ color: '#a0a0a0' }}>Cancel</Button>
           <Button variant="contained" onClick={handleFreePreview}>Get Free Preview</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Report Generation Timeout Modal */}
+      <Dialog
+        open={timeoutModalOpen}
+        onClose={() => {}} // intentionally non-dismissable — user must take action
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: '#0a0a0a',
+            border: '1px solid rgba(212, 175, 55, 0.4)',
+            borderRadius: 2,
+          },
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <HourglassEmpty sx={{ color: '#D4AF37', fontSize: 28 }} />
+            <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 600 }}>
+              Report Generation In Progress
+            </Typography>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent sx={{ pt: 1 }}>
+          <Box
+            sx={{
+              p: 2,
+              mb: 2.5,
+              bgcolor: 'rgba(212, 175, 55, 0.07)',
+              border: '1px solid rgba(212, 175, 55, 0.2)',
+              borderRadius: 1,
+            }}
+          >
+            <Typography variant="body2" sx={{ color: '#a0a0a0', lineHeight: 1.7 }}>
+              Your report is still being generated. Our AI engine is processing complex script
+              data across multiple territories — this can occasionally take longer than expected
+              depending on demand.
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 2 }}>
+            <Email sx={{ color: '#D4AF37', mt: 0.25, flexShrink: 0 }} />
+            <Typography variant="body2" sx={{ color: '#cccccc', lineHeight: 1.7 }}>
+              <strong style={{ color: '#ffffff' }}>You'll receive an email</strong> as soon as
+              your report is ready. No action is needed — just check your inbox.
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+            <Dashboard sx={{ color: '#D4AF37', mt: 0.25, flexShrink: 0 }} />
+            <Typography variant="body2" sx={{ color: '#cccccc', lineHeight: 1.7 }}>
+              You can also track the progress of this report from your{' '}
+              <strong style={{ color: '#ffffff' }}>Dashboard</strong> at any time.
+              {/* {timedOutReportId && (
+                <Typography
+                  component="span"
+                  variant="caption"
+                  sx={{ display: 'block', color: '#666', mt: 0.5, fontFamily: 'monospace' }}
+                >
+                  Report ID: {timedOutReportId}
+                </Typography>
+              )} */}
+            </Typography>
+          </Box>
+        </DialogContent>
+
+        <DialogActions sx={{ p: 3, pt: 1 }}>
+          <Button
+            variant="contained"
+            size="large"
+            fullWidth
+            onClick={() => {
+              setTimeoutModalOpen(false);
+              navigate('/dashboard');
+            }}
+            sx={{
+              bgcolor: '#D4AF37',
+              color: '#000000',
+              fontWeight: 700,
+              py: 1.5,
+              fontSize: '1rem',
+              '&:hover': { bgcolor: '#E5C158' },
+            }}
+          >
+            Go to Dashboard
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
