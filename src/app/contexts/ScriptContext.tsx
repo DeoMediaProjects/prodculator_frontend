@@ -207,7 +207,7 @@ function buildReportRequestBody(
   return body;
 }
 
-function mapReportToAnalysis(report: any, metadata: ScriptMetadata, isPreview = false): ScriptAnalysis {
+export function mapReportToAnalysis(report: any, metadata: ScriptMetadata, isPreview = false): ScriptAnalysis {
   const reportData = report?.report_data || {};
   const territoryAnalysis = toArray<any>(reportData.territoryAnalysis);
   const productionDetails = reportData.productionDetails || {};
