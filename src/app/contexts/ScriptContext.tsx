@@ -3,6 +3,20 @@ import { apiClient } from '@/services/api';
 import { authService } from '@/services/auth.service';
 import { databaseService } from '@/services/database.service';
 
+/**
+ * Thrown when report generation polling exceeds the timeout window.
+ * Carries the reportId so callers can surface a "still processing" UX
+ * rather than a generic error message.
+ */
+export class ReportTimeoutError extends Error {
+  readonly reportId: string;
+  constructor(reportId: string) {
+    super('Report generation is taking longer than expected.');
+    this.name = 'ReportTimeoutError';
+    this.reportId = reportId;
+  }
+}
+
 interface ScriptAnalysis {
   id?: string;
   // Tab 1: Script Summary
@@ -413,11 +427,7 @@ export function ScriptProvider({ children }: { children: ReactNode }) {
       await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
     }
 
-    return {
-      status: 'failed',
-      report_id: reportId,
-      error: 'Timed out waiting for report completion.',
-    };
+    throw new ReportTimeoutError(reportId);
   };
 
   // Calls backend pipeline: upload -> create report -> background processing -> fetch report.

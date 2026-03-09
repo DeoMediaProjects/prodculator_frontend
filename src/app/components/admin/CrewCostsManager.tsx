@@ -38,13 +38,30 @@ import {
   ExpandMore,
   ExpandLess,
 } from '@mui/icons-material';
+import { useAuth } from '@/app/contexts/AuthContext';
 import { adminApi } from '@/services/admin.api';
 import type { CrewRate, PendingChange, SyncStatus, SyncSettings, SyncSettingsUpdate } from '@/services/admin.types';
+import { AdminAccessDenied } from './AdminAccessDenied';
 
 const territories = ['United Kingdom', 'British Columbia', 'Georgia (USA)', 'Malta', 'South Africa'];
 const categories = ['Camera', 'Lighting', 'Sound', 'Art Department', 'Production', 'Post-Production'];
 
 export function CrewCostsManager() {
+  const { hasAdminPermission } = useAuth();
+
+  if (!hasAdminPermission('canEditCrewCosts')) {
+    return (
+      <AdminAccessDenied
+        requiredPermission="Edit Crew Costs"
+        requiredRole="Master Admin, Senior Admin, or Data Admin"
+      />
+    );
+  }
+
+  return <CrewCostsManagerContent />;
+}
+
+function CrewCostsManagerContent() {
   const [crewRates, setCrewRates] = useState<CrewRate[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);

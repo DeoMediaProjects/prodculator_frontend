@@ -1,11 +1,14 @@
 import { apiClient } from './api';
 import {
+  ADMIN_ADMIN_USERS_URL,
+  adminAdminUserUrl,
   ADMIN_METRICS_URL,
   ADMIN_INCENTIVES_URL,
   adminIncentiveUrl,
   ADMIN_CREW_COSTS_URL,
   adminCrewCostUrl,
   ADMIN_COMPARABLES_URL,
+  ADMIN_COMPARABLES_SYNC_TMDB_URL,
   adminComparableUrl,
   ADMIN_GRANTS_URL,
   ADMIN_GRANTS_BULK_IMPORT_URL,
@@ -24,6 +27,11 @@ import {
   adminFestivalPendingChangeRejectUrl,
   ADMIN_FESTIVALS_SYNC_SETTINGS_URL,
   adminFestivalUrl,
+  ADMIN_DATA_SOURCES_URL,
+  adminDataSourceUrl,
+  adminDataSourceTestUrl,
+  ADMIN_DATA_SOURCES_CONFIGURATION_URL,
+  ADMIN_DATA_SOURCES_SYNC_SCHEDULE_URL,
   ADMIN_INCENTIVES_SYNC_STATUS_URL,
   ADMIN_INCENTIVES_PENDING_CHANGES_URL,
   adminIncentivePendingChangeApproveUrl,
@@ -36,6 +44,18 @@ import {
   adminCrewCostPendingChangeRejectUrl,
   ADMIN_CREW_COSTS_SYNC_URL,
   ADMIN_CREW_COSTS_SYNC_SETTINGS_URL,
+  ADMIN_SUBSCRIBERS_URL,
+  ADMIN_SUBSCRIBERS_METRICS_URL,
+  adminSubscriberBlockUrl,
+  adminSubscriberUnblockUrl,
+  adminSubscriberCreditUrl,
+  ADMIN_EMAIL_GATING_URL,
+  adminEmailGatingBlockUrl,
+  adminEmailGatingUnblockUrl,
+  ADMIN_PDF_REPORTS_URL,
+  adminPdfReportPreviewUrl,
+  adminPdfReportDownloadUrl,
+  adminPdfReportResendUrl,
 } from './admin.apiurl';
 import type {
   AdminMetrics,
@@ -51,6 +71,26 @@ import type {
   SyncSettings,
   SyncSettingsUpdate,
   SyncTriggerResponse,
+  SubscriberMetrics,
+  Subscriber,
+  SubscriberListResponse,
+  CreditAdjustment,
+  CreditAdjustmentResponse,
+  TmdbSyncResponse,
+  DataSource,
+  DataSourceUpdate,
+  DataSourceTestResult,
+  DataSourceBulkSavePayload,
+  DataSourceBulkSaveResponse,
+  SyncScheduleResponse,
+  EmailGatingRecord,
+  PdfReport,
+  PdfReportPreviewResponse,
+  ResendReportResponse,
+  AdminUserRecord,
+  CreateAdminPayload,
+  CreateAdminResponse,
+  UpdateAdminPayload,
 } from './admin.types';
 import type { Festival } from '@/app/types/festival';
 
@@ -319,6 +359,15 @@ async function deleteComparable(id: string): ApiResult<void> {
   }
 }
 
+async function syncComparablesTMDB(): ApiResult<TmdbSyncResponse> {
+  try {
+    const data = await apiClient.post<TmdbSyncResponse>(ADMIN_COMPARABLES_SYNC_TMDB_URL, {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to sync from TMDB' };
+  }
+}
+
 // ── Grants ────────────────────────────────────────────────────────────────────
 async function getGrants(limit = 50, offset = 0, signal?: AbortSignal): ApiResult<PaginatedResponse<Grant>> {
   try {
@@ -536,8 +585,260 @@ async function updateFestivalSyncSettings(payload: SyncSettingsUpdate): ApiResul
   }
 }
 
+// ── Data Sources ─────────────────────────────────────────────────────────────
+async function getDataSources(limit = 50, offset = 0, signal?: AbortSignal): ApiResult<PaginatedResponse<DataSource>> {
+  try {
+    const data = await apiClient.get<PaginatedResponse<DataSource>>(
+      `${ADMIN_DATA_SOURCES_URL}${paginationQuery(limit, offset)}`,
+      { auth: true, signal },
+    );
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch data sources' };
+  }
+}
+
+async function getDataSource(sourceId: string, signal?: AbortSignal): ApiResult<DataSource> {
+  try {
+    const data = await apiClient.get<DataSource>(adminDataSourceUrl(sourceId), { auth: true, signal });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch data source' };
+  }
+}
+
+async function updateDataSource(sourceId: string, payload: DataSourceUpdate): ApiResult<DataSource> {
+  try {
+    const data = await apiClient.patch<DataSource>(adminDataSourceUrl(sourceId), payload, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to update data source' };
+  }
+}
+
+async function testDataSourceConnection(sourceId: string): ApiResult<DataSourceTestResult> {
+  try {
+    const data = await apiClient.post<DataSourceTestResult>(adminDataSourceTestUrl(sourceId), {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to test data source connection' };
+  }
+}
+
+async function bulkSaveDataSourceConfiguration(
+  payload: DataSourceBulkSavePayload,
+): ApiResult<DataSourceBulkSaveResponse> {
+  try {
+    const data = await apiClient.put<DataSourceBulkSaveResponse>(
+      ADMIN_DATA_SOURCES_CONFIGURATION_URL,
+      payload,
+      { auth: true },
+    );
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to save data source configuration' };
+  }
+}
+
+async function getDataSourceSyncSchedule(signal?: AbortSignal): ApiResult<SyncScheduleResponse> {
+  try {
+    const data = await apiClient.get<SyncScheduleResponse>(ADMIN_DATA_SOURCES_SYNC_SCHEDULE_URL, { auth: true, signal });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch data source sync schedule' };
+  }
+}
+
+// ── Subscribers ──────────────────────────────────────────────────────────────
+async function getSubscriberMetrics(signal?: AbortSignal): ApiResult<SubscriberMetrics> {
+  try {
+    const data = await apiClient.get<SubscriberMetrics>(ADMIN_SUBSCRIBERS_METRICS_URL, { auth: true, signal });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch subscriber metrics' };
+  }
+}
+
+interface SubscriberListParams {
+  status?: 'active' | 'past_due' | 'canceled';
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+async function getSubscribers(params: SubscriberListParams = {}, signal?: AbortSignal): ApiResult<SubscriberListResponse> {
+  try {
+    const query = new URLSearchParams();
+    if (params.status) query.set('status', params.status);
+    if (params.search) query.set('search', params.search);
+    query.set('limit', String(params.limit ?? 25));
+    query.set('offset', String(params.offset ?? 0));
+    const data = await apiClient.get<SubscriberListResponse>(
+      `${ADMIN_SUBSCRIBERS_URL}?${query.toString()}`,
+      { auth: true, signal },
+    );
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch subscribers' };
+  }
+}
+
+async function blockSubscriber(userId: string): ApiResult<{ success: boolean; message: string }> {
+  try {
+    const data = await apiClient.post<{ success: boolean; message: string }>(adminSubscriberBlockUrl(userId), {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to block subscriber' };
+  }
+}
+
+async function unblockSubscriber(userId: string): ApiResult<{ success: boolean; message: string }> {
+  try {
+    const data = await apiClient.post<{ success: boolean; message: string }>(adminSubscriberUnblockUrl(userId), {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to unblock subscriber' };
+  }
+}
+
+async function creditSubscriber(userId: string, payload: CreditAdjustment): ApiResult<CreditAdjustmentResponse> {
+  try {
+    const data = await apiClient.post<CreditAdjustmentResponse>(adminSubscriberCreditUrl(userId), payload, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to adjust subscriber credits' };
+  }
+}
+
+// ── Email Gating ─────────────────────────────────────────────────────────────
+async function getEmailGatingRecords(
+  params: { limit?: number; offset?: number; search?: string } = {},
+  signal?: AbortSignal,
+): ApiResult<PaginatedResponse<EmailGatingRecord>> {
+  try {
+    const query = new URLSearchParams();
+    query.set('limit', String(params.limit ?? 50));
+    query.set('offset', String(params.offset ?? 0));
+    if (params.search) query.set('search', params.search);
+    const data = await apiClient.get<PaginatedResponse<EmailGatingRecord>>(
+      `${ADMIN_EMAIL_GATING_URL}?${query.toString()}`,
+      { auth: true, signal },
+    );
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch email gating records' };
+  }
+}
+
+async function blockEmailGatingRecord(recordId: string): ApiResult<EmailGatingRecord> {
+  try {
+    const data = await apiClient.post<EmailGatingRecord>(adminEmailGatingBlockUrl(recordId), {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to block email' };
+  }
+}
+
+async function unblockEmailGatingRecord(recordId: string): ApiResult<EmailGatingRecord> {
+  try {
+    const data = await apiClient.post<EmailGatingRecord>(adminEmailGatingUnblockUrl(recordId), {}, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to unblock email' };
+  }
+}
+
+// ── PDF Reports ──────────────────────────────────────────────────────────────
+async function getPdfReports(limit = 25, offset = 0, signal?: AbortSignal): ApiResult<PaginatedResponse<PdfReport>> {
+  try {
+    const data = await apiClient.get<PaginatedResponse<PdfReport>>(
+      `${ADMIN_PDF_REPORTS_URL}${paginationQuery(limit, offset)}`,
+      { auth: true, signal },
+    );
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch PDF reports' };
+  }
+}
+
+async function getPdfReportPreviewUrl(reportId: string): ApiResult<PdfReportPreviewResponse> {
+  try {
+    const data = await apiClient.get<PdfReportPreviewResponse>(adminPdfReportPreviewUrl(reportId), { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to get report preview' };
+  }
+}
+
+async function downloadPdfReport(reportId: string): ApiResult<Blob> {
+  try {
+    const data = await apiClient.get<Blob>(adminPdfReportDownloadUrl(reportId), {
+      auth: true,
+      responseType: 'blob',
+    });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to download report' };
+  }
+}
+
+async function resendPdfReport(reportId: string, email?: string): ApiResult<ResendReportResponse> {
+  try {
+    const payload: Record<string, string> = {};
+    if (email) payload.email = email;
+    const data = await apiClient.post<ResendReportResponse>(adminPdfReportResendUrl(reportId), { payload }, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to re-send report' };
+  }
+}
+
+// ── Admin Users ──────────────────────────────────────────────────────────────
+async function getAdminUsers(limit = 50, offset = 0, signal?: AbortSignal): ApiResult<PaginatedResponse<AdminUserRecord>> {
+  try {
+    const data = await apiClient.get<PaginatedResponse<AdminUserRecord>>(
+      `${ADMIN_ADMIN_USERS_URL}${paginationQuery(limit, offset)}`,
+      { auth: true, signal },
+    );
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to fetch admin users' };
+  }
+}
+
+async function createAdminUser(payload: CreateAdminPayload): ApiResult<CreateAdminResponse> {
+  try {
+    const data = await apiClient.post<CreateAdminResponse>(ADMIN_ADMIN_USERS_URL, payload, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to create admin user' };
+  }
+}
+
+async function updateAdminUser(id: string, payload: UpdateAdminPayload): ApiResult<AdminUserRecord> {
+  try {
+    const data = await apiClient.put<AdminUserRecord>(adminAdminUserUrl(id), payload, { auth: true });
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to update admin user' };
+  }
+}
+
+async function deleteAdminUser(id: string): ApiResult<void> {
+  try {
+    await apiClient.delete(adminAdminUserUrl(id), { auth: true });
+    return { data: null, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : 'Failed to delete admin user' };
+  }
+}
+
 // ── Named export ──────────────────────────────────────────────────────────────
 export const adminApi = {
+  getAdminUsers,
+  createAdminUser,
+  updateAdminUser,
+  deleteAdminUser,
   getMetrics,
   getIncentives,
   createIncentive,
@@ -565,6 +866,7 @@ export const adminApi = {
   createComparable,
   updateComparable,
   deleteComparable,
+  syncComparablesTMDB,
   getGrants,
   createGrant,
   updateGrant,
@@ -588,4 +890,22 @@ export const adminApi = {
   rejectFestivalPendingChange,
   getFestivalSyncSettings,
   updateFestivalSyncSettings,
+  getDataSources,
+  getDataSource,
+  updateDataSource,
+  testDataSourceConnection,
+  bulkSaveDataSourceConfiguration,
+  getDataSourceSyncSchedule,
+  getSubscriberMetrics,
+  getSubscribers,
+  blockSubscriber,
+  unblockSubscriber,
+  creditSubscriber,
+  getEmailGatingRecords,
+  blockEmailGatingRecord,
+  unblockEmailGatingRecord,
+  getPdfReports,
+  getPdfReportPreviewUrl,
+  downloadPdfReport,
+  resendPdfReport,
 };

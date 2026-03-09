@@ -25,8 +25,16 @@ import {
   CloudDownload,
   Api,
 } from '@mui/icons-material';
+import { useAuth } from '@/app/contexts/AuthContext';
+import { AdminAccessDenied } from './AdminAccessDenied';
 
 export function BusinessMetrics() {
+  const { hasAdminPermission } = useAuth();
+
+  if (!hasAdminPermission('canViewBusinessMetrics')) {
+    return <AdminAccessDenied requiredPermission="View Business Metrics" requiredRole="Master Admin or Senior Admin" />;
+  }
+
   // Key Business Metrics
   const keyMetrics = [
     {

@@ -29,7 +29,9 @@ import {
   TheaterComedy,
   GroupWork,
 } from '@mui/icons-material';
+import { useAuth } from '@/app/contexts/AuthContext';
 import { productionIntelligenceManager } from '@/app/data/ProductionIntelligenceManager';
+import { AdminAccessDenied } from './AdminAccessDenied';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -51,6 +53,21 @@ function TabPanel(props: TabPanelProps) {
 }
 
 export function ProductionIntelligence() {
+  const { hasAdminPermission } = useAuth();
+
+  if (!hasAdminPermission('canViewPlatformEconomics')) {
+    return (
+      <AdminAccessDenied
+        requiredPermission="View Platform Economics"
+        requiredRole="Master Admin or Senior Admin"
+      />
+    );
+  }
+
+  return <ProductionIntelligenceContent />;
+}
+
+function ProductionIntelligenceContent() {
   const [activeTab, setActiveTab] = useState(0);
   const [territory, setTerritory] = useState<string>('all');
   const [dateRange, setDateRange] = useState<string>('90days');

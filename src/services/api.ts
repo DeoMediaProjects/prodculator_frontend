@@ -211,6 +211,10 @@ axiosClient.interceptors.response.use(
       clearTokens();
     }
 
+    if (axios.isCancel(error)) {
+      return Promise.reject(error);
+    }
+
     logError(method, url, originalRequest.data, {
       status: error.response?.status,
       data: error.response?.data,
@@ -288,6 +292,12 @@ export const apiClient = {
     request<T>(path, {
       ...options,
       method: 'POST',
+      data: body,
+    }),
+  put: <T>(path: string, body?: unknown, options: RequestOptions = {}) =>
+    request<T>(path, {
+      ...options,
+      method: 'PUT',
       data: body,
     }),
   patch: <T>(path: string, body?: unknown, options: RequestOptions = {}) =>

@@ -91,13 +91,20 @@ export interface ComparableProduction {
   id: string;
   title: string;
   year: number;
-  genre: string;
+  genre: string | string[];
   budget: number;
   territory: string;
   incentiveUsed: string;
   tmdbId?: string;
   source: string;
   lastUpdated: string;
+}
+
+export interface TmdbSyncResponse {
+  message: string;
+  imported: number;
+  skipped: number;
+  total: number;
 }
 
 // ── Grants ────────────────────────────────────────────────────────────────────
@@ -130,6 +137,184 @@ export interface BulkImportResult {
   imported: number;
   failed: number;
   errors: { row: number; reason: string }[];
+}
+
+// ── Subscribers ──────────────────────────────────────────────────────────────
+export interface SubscriberMetrics {
+  total_paid_users: number;
+  mrr_usd: number;
+  mrr_gbp: number;
+  reports_this_month_total: number;
+  reports_this_month_free: number;
+  reports_this_month_paid: number;
+  avg_reports_per_user: number;
+  plan_distribution: PlanDistributionEntry[];
+}
+
+export interface PlanDistributionEntry {
+  plan: string;
+  user_count: number;
+  revenue: number;
+}
+
+export interface Subscriber {
+  id: string;
+  name: string;
+  email: string;
+  company: string;
+  plan: string;
+  status: string;
+  reports_this_month: number;
+  report_limit: number | null;
+  monthly_spend: number;
+  payment_currency: 'USD' | 'GBP';
+  join_date: string;
+  last_active: string | null;
+  total_reports_generated: number;
+}
+
+export interface SubscriberListResponse extends PaginatedResponse<Subscriber> {
+  counts: {
+    active: number;
+    past_due: number;
+    canceled: number;
+  };
+}
+
+export interface CreditAdjustment {
+  adjustment: number;
+  reason?: string;
+}
+
+export interface CreditAdjustmentResponse {
+  id: string;
+  credits_remaining: number;
+}
+
+// ── Data Sources ─────────────────────────────────────────────────────────────
+export type DataSourceStatus = 'unknown' | 'connected' | 'disconnected';
+export type DataSourceCredentialMode = 'backend_env' | (string & {});
+export type DataSourceSyncSchedule =
+  | 'on-demand'
+  | 'daily'
+  | 'weekly'
+  | 'monthly'
+  | 'quarterly'
+  | 'semi_annual'
+  | 'annual'
+  | null;
+
+export interface DataSource {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+  description: string;
+  endpoint: string;
+  enabled: boolean;
+  status: DataSourceStatus;
+  credential_mode: DataSourceCredentialMode;
+  credential_configured: boolean;
+  is_implemented: boolean;
+  last_tested_at: string | null;
+  last_test_result: string | null;
+  last_test_message: string | null;
+  sync_schedule: DataSourceSyncSchedule;
+  updated_at: string | null;
+}
+
+export interface DataSourceUpdate {
+  enabled?: boolean;
+  sync_schedule?: DataSourceSyncSchedule;
+}
+
+export interface DataSourceListResponse extends PaginatedResponse<DataSource> {
+}
+
+export interface DataSourceTestResult {
+  slug: string;
+  status: Exclude<DataSourceStatus, 'unknown'>;
+  latency_ms: number;
+  message: string;
+  tested_at: string;
+}
+
+export interface DataSourceBulkSavePayload {
+  sources: { id: string; enabled: boolean }[];
+}
+
+export interface DataSourceBulkSaveResponse {
+  updated: number;
+}
+
+export interface SyncScheduleItem {
+  slug: string;
+  name: string;
+  sync_schedule: DataSourceSyncSchedule;
+  last_tested_at: string | null;
+  enabled: boolean;
+}
+
+export interface SyncScheduleResponse {
+  items: SyncScheduleItem[];
+}
+
+// ── Email Gating ─────────────────────────────────────────────────────────────
+export interface EmailGatingRecord {
+  id: string;
+  email: string;
+  date: string;
+  report_generated: boolean;
+  blocked: boolean;
+}
+
+// ── PDF Reports ──────────────────────────────────────────────────────────────
+export interface PdfReport {
+  id: string;
+  title: string;
+  email: string;
+  generated: string;
+  downloaded: boolean;
+  size: string;
+}
+
+export interface PdfReportPreviewResponse {
+  url: string;
+}
+
+export interface ResendReportResponse {
+  success: boolean;
+  message: string;
+}
+
+// ── Admin User Management ────────────────────────────────────────────────────
+export type AdminRoleValue = 'master_admin' | 'senior_admin' | 'data_admin' | 'support_admin';
+
+export interface AdminUserRecord {
+  id: string;
+  email: string;
+  name: string;
+  role: AdminRoleValue;
+  last_login: string | null;
+  created_at: string;
+}
+
+export interface CreateAdminPayload {
+  email: string;
+  name?: string;
+  role: AdminRoleValue;
+}
+
+export interface CreateAdminResponse {
+  admin: AdminUserRecord;
+  temporary_password: string;
+}
+
+export interface UpdateAdminPayload {
+  name?: string;
+  email?: string;
+  role?: AdminRoleValue;
+  password?: string;
 }
 
 // Festival is defined in src/app/types/festival.ts — import from there directly.
