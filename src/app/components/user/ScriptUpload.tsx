@@ -327,7 +327,7 @@ export function ScriptUpload() {
               }} 
             />
             <Typography variant="body2" sx={{ color: '#a0a0a0' }}>
-              Our AI is parsing your script for location cues and technical requirements. This takes ~30 seconds.
+              Our AI is parsing your script for location cues and technical requirements. This will take a few minutes.
             </Typography>
           </Paper>
         )}
