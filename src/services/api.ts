@@ -1,4 +1,5 @@
 import axios, { AxiosError, AxiosHeaders, AxiosRequestConfig } from 'axios';
+import type { Territory } from '@/services/admin.types';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '');
 
@@ -202,9 +203,9 @@ axiosClient.interceptors.response.use(
         originalRequest._isRetry = true;
         const token = getAccessToken();
         if (token) {
-          const headers = AxiosHeaders.from(originalRequest.headers || {});
-          headers.set('Authorization', `Bearer ${token}`);
-          originalRequest.headers = headers;
+          // originalRequest.headers is always an AxiosHeaders instance at runtime;
+          // the wide static type on AxiosRequestConfig just can't express that.
+          (originalRequest.headers as AxiosHeaders).set('Authorization', `Bearer ${token}`);
         }
         return axiosClient.request(originalRequest);
       }
@@ -229,14 +230,14 @@ axiosClient.interceptors.response.use(
   }
 );
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function request<TData>(path: string, options: RequestOptions = {}): Promise<TData> {
   const { auth = false, _isRetry = false, ...axiosOptions } = options;
-  const response = await axiosClient.request<T>({
+  const response = await axiosClient.request<TData>({
     url: path,
     ...axiosOptions,
     _requiresAuth: auth,
     _isRetry,
-  });
+  } as InternalRequestConfig);
   return response.data;
 }
 
@@ -315,3 +316,10 @@ export const apiClient = {
       data: formData,
     }),
 };
+
+// ── Public endpoints (no auth required) ──────────────────────────────────────
+
+/** Fetches the canonical territory list from GET /api/territories. */
+export async function getTerritories(): Promise<Territory[]> {
+  return apiClient.get<Territory[]>('/api/territories');
+}

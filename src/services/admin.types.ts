@@ -49,16 +49,39 @@ export interface PendingChange {
 // ── Crew Costs ────────────────────────────────────────────────────────────────
 export interface CrewRate {
   id: string;
-  territory: string;
-  role: string;
-  category: string;
-  dayRate: number;
-  weekRate: number;
-  union: string;
+  // Legacy fields (may be null for newer records)
+  territory: string | null;
+  category: string | null;
+  dayRate: number | null;
+  weekRate: number | null;
+  union: string | null;
   lastUpdated: string | null;
   source: string | null;
-  createdAt?: string | null;
-  updatedAt?: string | null;
+  currency: string | null;
+  // Core fields always present
+  role: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+  // New structured fields from API
+  country: string;
+  region: string;
+  roleCategory: string;
+  department: string;
+  unionRateCents: number;
+  nonUnionRateCents: number;
+  rateCurrency: string;
+  workingDayHours: number;
+  fringeRatePct: number;
+  fringeDescription: string | null;
+  sourceName: string;
+  sourceUrl: string | null;
+  sourceType: string;
+  confidenceScore: number;
+  effectiveFrom: string | null;
+  notes: string | null;
+  budgetBand: string | null;
+  rateNotes: string | null;
+  lastVerifiedAt: string | null;
 }
 
 // ── Sync System (shared by incentives & crew costs) ──────────────────────────
@@ -318,3 +341,16 @@ export interface UpdateAdminPayload {
 }
 
 // Festival is defined in src/app/types/festival.ts — import from there directly.
+
+// ── Territories ───────────────────────────────────────────────────────────────
+/** One item from GET /api/territories */
+export interface Territory {
+  /** Canonical display name, e.g. "United Kingdom" */
+  label: string;
+  /** ISO 3166-1 alpha-2 code, e.g. "GB" */
+  iso: string;
+  /** Parent country label for sub-territories, otherwise null */
+  parent: string | null;
+  /** true for states / regions / devolved nations */
+  isSubTerritory: boolean;
+}

@@ -6,7 +6,6 @@ import {
   Paper,
   Typography,
   TextField,
-  Button,
   InputAdornment,
   IconButton,
   Alert,
@@ -15,6 +14,7 @@ import {
   Checkbox,
   Divider,
   Link,
+  Button,
   FormControl,
   InputLabel,
   Select,
@@ -25,7 +25,7 @@ import exampleLogo from '@/assets/2ac5b205356b38916f5ff32008dfa103d8ffc2cb.png';
 
 export function UserSignup() {
   const navigate = useNavigate();
-  const { userSignup } = useAuth();
+  const { userSignup, googleLogin } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -78,6 +78,25 @@ export function UserSignup() {
       }
     } catch (err) {
       setError('An error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignUp = async () => {
+    setError('');
+    setLoading(true);
+
+    try {
+      const success = await googleLogin();
+
+      if (success) {
+        navigate('/dashboard');
+      } else {
+        setError('Google sign-up failed. Please try again.');
+      }
+    } catch (_err) {
+      setError('Google sign-up failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -356,6 +375,45 @@ export function UserSignup() {
             </Button>
           </Box>
 
+          <Divider sx={{ my: 3, borderColor: 'rgba(212, 175, 55, 0.2)' }}>
+            <Typography variant="body2" sx={{ color: '#666', px: 1 }}>
+              or
+            </Typography>
+          </Divider>
+
+          <Button
+            fullWidth
+            variant="outlined"
+            size="large"
+            disabled={loading}
+            onClick={handleGoogleSignUp}
+            startIcon={
+              <svg width="20" height="20" viewBox="0 0 48 48">
+                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                <path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.0 24.0 0 0 0 0 21.56l7.98-6.19z"/>
+                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+              </svg>
+            }
+            sx={{
+              borderColor: '#333',
+              color: '#FFFFFF',
+              fontWeight: 600,
+              py: 1.5,
+              fontSize: '1rem',
+              '&:hover': {
+                borderColor: '#D4AF37',
+                bgcolor: 'rgba(212, 175, 55, 0.05)',
+              },
+              '&:disabled': {
+                borderColor: '#333',
+                color: '#666',
+              },
+            }}
+          >
+            Sign up with Google
+          </Button>
+
           <Divider sx={{ my: 4, borderColor: 'rgba(212, 175, 55, 0.2)' }} />
 
           <Box sx={{ textAlign: 'center' }}>
@@ -363,7 +421,7 @@ export function UserSignup() {
               Already have an account?
             </Typography>
             <Button
-              component={Link}
+              component={RouterLink}
               to="/login"
               variant="outlined"
               fullWidth

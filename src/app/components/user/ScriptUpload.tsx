@@ -35,12 +35,14 @@ import { useScript, ScriptMetadata } from '@/app/contexts/ScriptContext';
 import { ReportTimeoutError } from '@/app/contexts/ScriptContext';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { InfoTip, TOOLTIP_TEXTS } from '@/app/components/common/InfoTip';
+import { useTerritories } from '@/app/hooks/useTerritories';
 import exampleLogo from '@/assets/2ac5b205356b38916f5ff32008dfa103d8ffc2cb.png';
 
 export function ScriptUpload() {
   const navigate = useNavigate();
   const { generateAnalysis, generatePreview } = useScript();
   const { isAuthenticated, user, hasUsedFreeReport, markFreeReportUsed } = useAuth();
+  const { countries: countryOptions, territories: allTerritories } = useTerritories();
 
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
@@ -71,7 +73,7 @@ export function ScriptUpload() {
 
   // Production strategy fields
   const [locationStrategy, setLocationStrategy] = useState('open');
-  const [territoriesConsidering, setTerritoriesConsidering] = useState<string[]>(['UK', 'Malta', 'Hungary']);
+  const [territoriesConsidering, setTerritoriesConsidering] = useState<string[]>(['United Kingdom', 'Malta', 'Hungary']);
   const [productionPriority, setProductionPriority] = useState('full');
 
   // ✅ SECTION 2a: Genre options - expanded list (no pre-selection)
@@ -119,15 +121,15 @@ export function ScriptUpload() {
   // Get state/province options based on selected country
   const getStateProvinceOptions = () => {
     switch (country) {
-      case 'USA': return usaStates;
-      case 'Canada': return canadaProvinces;
-      case 'Australia': return australiaStates;
+      case 'United States': return usaStates;
+      case 'Canada':        return canadaProvinces;
+      case 'Australia':     return australiaStates;
       default: return [];
     }
   };
 
   // Show state/province field for countries with regional incentives
-  const showStateProvince = ['USA', 'Canada', 'Australia'].includes(country);
+  const showStateProvince = ['United States', 'Canada', 'Australia'].includes(country);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -327,7 +329,7 @@ export function ScriptUpload() {
               }} 
             />
             <Typography variant="body2" sx={{ color: '#a0a0a0' }}>
-              Our AI is parsing your script for location cues and technical requirements. This takes ~30 seconds.
+              Our AI is parsing your script for location cues and technical requirements. This will take a few minutes.
             </Typography>
           </Paper>
         )}
@@ -454,18 +456,9 @@ export function ScriptUpload() {
                         label="Production Country" 
                         onChange={(e) => setCountry(e.target.value)}
                       >
-                        <MenuItem value="UK">United Kingdom</MenuItem>
-                        <MenuItem value="Canada">Canada</MenuItem>
-                        <MenuItem value="USA">USA</MenuItem>
-                        <MenuItem value="Australia">Australia</MenuItem>
-                        <MenuItem value="Malta">Malta</MenuItem>
-                        <MenuItem value="Ireland">Ireland</MenuItem>
-                        <MenuItem value="France">France</MenuItem>
-                        <MenuItem value="Germany">Germany</MenuItem>
-                        <MenuItem value="Spain">Spain</MenuItem>
-                        <MenuItem value="Czech Republic">Czech Republic</MenuItem>
-                        <MenuItem value="Hungary">Hungary</MenuItem>
-                        <MenuItem value="Other">Other</MenuItem>
+                        {countryOptions.map((t) => (
+                          <MenuItem key={t.iso} value={t.label}>{t.label}</MenuItem>
+                        ))}
                       </Select>
                     </FormControl>
                   </Grid>
@@ -537,39 +530,18 @@ export function ScriptUpload() {
                         <InfoTip text={TOOLTIP_TEXTS.territoriesConsidering} />
                       </Typography>
                       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                        {/* ✅ SECTION 2d: Full 15-territory list */}
-                        {[
-                          { value: 'UK', label: 'UK' },
-                          { value: 'France', label: 'France' },
-                          { value: 'Malta', label: 'Malta' },
-                          { value: 'Hungary', label: 'Hungary' },
-                          { value: 'Czech Republic', label: 'Czech Republic' },
-                          { value: 'Spain', label: 'Spain' },
-                          { value: 'Italy', label: 'Italy' },
-                          { value: 'Georgia (USA)', label: 'Georgia (USA)' },
-                          { value: 'New Mexico', label: 'New Mexico' },
-                          { value: 'New York', label: 'New York' },
-                          { value: 'British Columbia', label: 'British Columbia' },
-                          { value: 'Australia', label: 'Australia' },
-                          { value: 'New Zealand', label: 'New Zealand' },
-                          { value: 'South Africa', label: 'South Africa' },
-                          { value: 'Portugal', label: 'Portugal' },
-                          { value: 'Morocco', label: 'Morocco' },
-                          { value: 'Serbia', label: 'Serbia' },
-                          { value: 'Romania', label: 'Romania' },
-                          { value: 'Open to all', label: 'Open to all' },
-                        ].map((territory) => (
+                        {/* All 41 territories from API (countries + sub-territories) + "Open to all" sentinel */}
+                        {[...allTerritories, { label: 'Open to all', iso: 'ALL', parent: null, isSubTerritory: false }].map((territory) => (
                           <Chip
-                            key={territory.value}
+                            key={territory.iso}
                             label={territory.label}
                             onClick={() => {
-                              // ✅ SECTION 10g: "Open to all" logic - de-emphasise other chips
-                              if (territory.value === 'Open to all') {
+                              if (territory.label === 'Open to all') {
                                 setTerritoriesConsidering(['Open to all']);
-                              } else if (territoriesConsidering.includes(territory.value)) {
-                                setTerritoriesConsidering(territoriesConsidering.filter(t => t !== territory.value));
+                              } else if (territoriesConsidering.includes(territory.label)) {
+                                setTerritoriesConsidering(territoriesConsidering.filter(t => t !== territory.label));
                               } else {
-                                setTerritoriesConsidering([...territoriesConsidering.filter(t => t !== 'Open to all'), territory.value]);
+                                setTerritoriesConsidering([...territoriesConsidering.filter(t => t !== 'Open to all'), territory.label]);
                               }
                             }}
                             sx={{
@@ -578,7 +550,7 @@ export function ScriptUpload() {
                               fontSize: '0.875rem',
                               fontWeight: 500,
                               cursor: 'pointer',
-                              ...(territoriesConsidering.includes(territory.value) ? {
+                              ...(territoriesConsidering.includes(territory.label) ? {
                                 bgcolor: '#D4AF37',
                                 color: '#000000',
                                 '&:hover': { bgcolor: '#E5C158' },
@@ -586,7 +558,7 @@ export function ScriptUpload() {
                                 bgcolor: 'rgba(212, 175, 55, 0.1)',
                                 color: '#D4AF37',
                                 border: '1px solid rgba(212, 175, 55, 0.5)',
-                                opacity: territoriesConsidering.includes('Open to all') ? 0.5 : 1, // De-emphasise when "Open to all" selected
+                                opacity: territoriesConsidering.includes('Open to all') ? 0.5 : 1,
                                 '&:hover': { borderColor: '#D4AF37', bgcolor: 'rgba(212, 175, 55, 0.2)' },
                               }),
                             }}

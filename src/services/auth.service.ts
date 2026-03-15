@@ -3,6 +3,8 @@
  * Frontend auth flows routed through FastAPI backend.
  */
 
+import { signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider } from '@/lib/firebase';
 import {
   apiClient,
   clearTokens,
@@ -132,6 +134,40 @@ export class AuthService {
     } catch (error) {
       clearTokens();
       return { user: null, error: error instanceof Error ? error.message : 'Token refresh failed' };
+    }
+  }
+
+  async signInWithGoogle(): Promise<{ user: AuthUser | null; error: string | null }> {
+    try {
+      // Step 1: Firebase handles the Google OAuth popup
+      const result = await signInWithPopup(auth, googleProvider);
+
+      // Step 2: Get the short-lived Firebase ID token
+      const idToken = await result.user.getIdToken();
+
+      // Step 3: Exchange the Firebase ID token for backend JWT
+      const response = await fetch(`${apiClient.baseUrl}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id_token: idToken }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => null);
+        const detail =
+          typeof err?.detail === 'string'
+            ? err.detail
+            : JSON.stringify(err?.detail ?? err ?? response.statusText);
+        throw new Error(detail);
+      }
+
+      const data: TokenResponse = await response.json();
+
+      // Step 4: Store backend JWT
+      setTokens(data.access_token, data.refresh_token);
+      return { user: data.user, error: null };
+    } catch (error) {
+      return { user: null, error: error instanceof Error ? error.message : 'Google sign-in failed' };
     }
   }
 

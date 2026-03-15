@@ -52,6 +52,7 @@ interface AuthContextType {
   // User auth
   userLogin: (email: string, password: string) => Promise<boolean>;
   userSignup: (userData: SignupData) => Promise<boolean>;
+  googleLogin: () => Promise<boolean>;
   userLogout: () => void;
 
   // Admin auth
@@ -197,6 +198,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
+  const googleLogin = async (): Promise<boolean> => {
+    const { user: authUser, error } = await authService.signInWithGoogle();
+
+    if (error || !authUser) {
+      console.error('Google login error:', error);
+      return false;
+    }
+
+    setUser({
+      email: authUser.email,
+      plan: authUser.plan || 'free',
+      reportsUsed: 0,
+      reportsLimit: authUser.credits_remaining || 0,
+    });
+
+    return true;
+  };
+
   const userSignup = async (userData: SignupData): Promise<boolean> => {
     const { user: authUser, error } = await authService.signUp(
       userData.email,
@@ -274,6 +293,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         markFreeReportUsed,
         userLogin,
         userSignup,
+        googleLogin,
         userLogout,
         adminUser,
         isAdminAuthenticated: !!adminUser,
