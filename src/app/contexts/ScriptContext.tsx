@@ -180,8 +180,7 @@ function toArray<T>(value: unknown): T[] {
 
 function buildReportRequestBody(
   metadata: ScriptMetadata,
-  reportType: 'preview' | 'paid' | 'b2b',
-  scriptFilePath?: string
+  reportType: 'preview' | 'paid' | 'b2b'
 ): Record<string, unknown> {
   const body: Record<string, unknown> = {
     script_title: metadata.title,
@@ -193,7 +192,6 @@ function buildReportRequestBody(
     location_strategy: metadata.locationStrategy,
     production_priority: metadata.productionPriority,
   };
-  if (scriptFilePath) body.script_file_path = scriptFilePath;
   if (metadata.stateProvince) body.state_province = metadata.stateProvince;
   if (metadata.territoriesConsidering?.length) body.territories_considering = metadata.territoriesConsidering;
   if (metadata.filmingStart) body.filming_start_date = metadata.filmingStart;
@@ -430,7 +428,7 @@ export function ScriptProvider({ children }: { children: ReactNode }) {
     throw new ReportTimeoutError(reportId);
   };
 
-  // Calls backend pipeline: upload -> create report -> background processing -> fetch report.
+  // Calls backend pipeline: create report (multipart) -> background processing -> fetch report.
   const generateAnalysis = async (file: File, metadata: ScriptMetadata): Promise<ScriptAnalysis> => {
     setIsProcessing(true);
 
@@ -440,15 +438,16 @@ export function ScriptProvider({ children }: { children: ReactNode }) {
         throw new Error('You must be signed in to generate a full report.');
       }
 
-      const upload = await databaseService.uploadScript(user.id, file);
-      if (upload.error || !upload.path) {
-        throw new Error(upload.error || 'Failed to upload script');
-      }
+      const body = buildReportRequestBody(metadata, 'paid');
 
-      const body = buildReportRequestBody(metadata, 'paid', upload.path);
-      const createResponse = await apiClient.post<{ status: string; report_id: string }>(
+      // Single multipart request: script file + metadata together
+      const form = new FormData();
+      form.append('script_file', file);
+      form.append('body', JSON.stringify(body));
+
+      const createResponse = await apiClient.upload<{ status: string; report_id: string }>(
         '/api/reports',
-        body,
+        form,
         { auth: true }
       );
       if (!createResponse.report_id) {

@@ -43,8 +43,16 @@ import { adminApi } from '@/services/admin.api';
 import type { CrewRate, PendingChange, SyncStatus, SyncSettings, SyncSettingsUpdate } from '@/services/admin.types';
 import { AdminAccessDenied } from './AdminAccessDenied';
 
-const territories = ['United Kingdom', 'British Columbia', 'Georgia (USA)', 'Malta', 'South Africa'];
-const categories = ['Camera', 'Lighting', 'Sound', 'Art Department', 'Production', 'Post-Production'];
+/** Convert integer cents to a human-readable dollar/currency string */
+const formatRate = (cents: number | null | undefined, currency = 'USD') => {
+  if (cents == null) return '—';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(cents / 100);
+};
 
 export function CrewCostsManager() {
   const { hasAdminPermission } = useAuth();
@@ -124,7 +132,7 @@ function CrewCostsManagerContent() {
       const payload: CrewRate = {
         ...editingRate,
         ...formData,
-        lastUpdated: new Date().toISOString().split('T')[0],
+        updatedAt: new Date().toISOString(),
       } as CrewRate;
       const { data, error } = await adminApi.updateCrewRate(editingRate.id, payload);
       if (!error && data) {
@@ -134,7 +142,8 @@ function CrewCostsManagerContent() {
       const payload: CrewRate = {
         ...formData,
         id: '',
-        lastUpdated: new Date().toISOString().split('T')[0],
+        updatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       } as CrewRate;
       const { data, error } = await adminApi.createCrewRate(payload);
       if (!error && data) {
@@ -523,38 +532,64 @@ function CrewCostsManagerContent() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {crewRates.map((rate) => (
-                <TableRow key={rate.id} sx={{ '&:hover': { bgcolor: 'rgba(212, 175, 55, 0.05)' } }}>
-                  <TableCell sx={{ color: '#ffffff' }}>{rate.territory}</TableCell>
-                  <TableCell sx={{ color: '#ffffff' }}>{rate.role}</TableCell>
-                  <TableCell>
-                    <Chip
-                      label={rate.category}
-                      size="small"
-                      sx={{
-                        bgcolor: 'rgba(212, 175, 55, 0.2)',
-                        color: '#D4AF37',
-                        fontWeight: 600,
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell sx={{ color: '#ffffff' }}>${rate.dayRate}</TableCell>
-                  <TableCell sx={{ color: '#ffffff' }}>${rate.weekRate}</TableCell>
-                  <TableCell sx={{ color: '#ffffff', fontSize: '0.875rem' }}>{rate.union}</TableCell>
-                  <TableCell sx={{ color: '#a0a0a0', fontSize: '0.875rem' }}>{rate.source}</TableCell>
-                  <TableCell sx={{ color: '#a0a0a0', fontSize: '0.875rem' }}>{rate.lastUpdated}</TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <IconButton size="small" onClick={() => handleEdit(rate)}>
-                        <Edit sx={{ color: '#D4AF37', fontSize: 18 }} />
-                      </IconButton>
-                      <IconButton size="small" onClick={() => handleDelete(rate.id)}>
-                        <Delete sx={{ color: '#f44336', fontSize: 18 }} />
-                      </IconButton>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {crewRates.map((rate) => {
+                // Derive display values from new API fields, falling back to legacy fields
+                const displayTerritory = rate.country
+                  ? `${rate.country}${rate.region ? ` / ${rate.region}` : ''}`
+                  : (rate.territory ?? '—');
+                const displayCategory = rate.roleCategory ?? rate.category ?? '—';
+                const displayUnion = rate.rateCurrency
+                  ? `${rate.rateCurrency} · ${rate.department}`
+                  : (rate.union ?? '—');
+                const displaySource = rate.sourceName ?? rate.source ?? '—';
+                const displayLastUpdated = rate.updatedAt
+                  ? formatDate(rate.updatedAt)
+                  : formatDate(rate.lastUpdated);
+                const currency = rate.rateCurrency ?? 'USD';
+
+                // Day rate: prefer unionRateCents (new) over dayRate (legacy, already in dollars)
+                const dayRateDisplay = rate.unionRateCents != null
+                  ? `${formatRate(rate.unionRateCents, currency)} – ${formatRate(rate.nonUnionRateCents, currency)}`
+                  : rate.dayRate != null
+                  ? `$${rate.dayRate}`
+                  : '—';
+
+                // Week rate: legacy field only (new API is day-based)
+                const weekRateDisplay = rate.weekRate != null ? `$${rate.weekRate}` : '—';
+
+                return (
+                  <TableRow key={rate.id} sx={{ '&:hover': { bgcolor: 'rgba(212, 175, 55, 0.05)' } }}>
+                    <TableCell sx={{ color: '#ffffff' }}>{displayTerritory}</TableCell>
+                    <TableCell sx={{ color: '#ffffff' }}>{rate.role}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={displayCategory}
+                        size="small"
+                        sx={{
+                          bgcolor: 'rgba(212, 175, 55, 0.2)',
+                          color: '#D4AF37',
+                          fontWeight: 600,
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ color: '#ffffff', whiteSpace: 'nowrap' }}>{dayRateDisplay}</TableCell>
+                    <TableCell sx={{ color: '#ffffff' }}>{weekRateDisplay}</TableCell>
+                    <TableCell sx={{ color: '#a0a0a0', fontSize: '0.8rem' }}>{displayUnion}</TableCell>
+                    <TableCell sx={{ color: '#a0a0a0', fontSize: '0.8rem', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displaySource}</TableCell>
+                    <TableCell sx={{ color: '#a0a0a0', fontSize: '0.875rem' }}>{displayLastUpdated}</TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <IconButton size="small" onClick={() => handleEdit(rate)}>
+                          <Edit sx={{ color: '#D4AF37', fontSize: 18 }} />
+                        </IconButton>
+                        <IconButton size="small" onClick={() => handleDelete(rate.id)}>
+                          <Delete sx={{ color: '#f44336', fontSize: 18 }} />
+                        </IconButton>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>
@@ -579,18 +614,17 @@ function CrewCostsManagerContent() {
         <DialogContent>
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mt: 2 }}>
             <TextField
-              select
-              label="Territory"
-              value={formData.territory || ''}
-              onChange={(e) => setFormData({ ...formData, territory: e.target.value })}
+              label="Country (e.g. US, CA, GB)"
+              value={formData.country || ''}
+              onChange={(e) => setFormData({ ...formData, country: e.target.value })}
               fullWidth
-            >
-              {territories.map((territory) => (
-                <MenuItem key={territory} value={territory}>
-                  {territory}
-                </MenuItem>
-              ))}
-            </TextField>
+            />
+            <TextField
+              label="Region (optional)"
+              value={formData.region || ''}
+              onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+              fullWidth
+            />
             <TextField
               label="Role"
               value={formData.role || ''}
@@ -598,43 +632,61 @@ function CrewCostsManagerContent() {
               fullWidth
             />
             <TextField
+              label="Role Category (e.g. HOD-Camera)"
+              value={formData.roleCategory || ''}
+              onChange={(e) => setFormData({ ...formData, roleCategory: e.target.value })}
+              fullWidth
+            />
+            <TextField
               select
-              label="Category"
-              value={formData.category || ''}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              label="Department / Rate Type"
+              value={formData.department || 'day'}
+              onChange={(e) => setFormData({ ...formData, department: e.target.value })}
               fullWidth
             >
-              {categories.map((category) => (
-                <MenuItem key={category} value={category}>
-                  {category}
-                </MenuItem>
+              {['day', 'week', 'session'].map((d) => (
+                <MenuItem key={d} value={d}>{d}</MenuItem>
               ))}
             </TextField>
             <TextField
-              label="Union/Guild"
-              value={formData.union || ''}
-              onChange={(e) => setFormData({ ...formData, union: e.target.value })}
+              label="Rate Currency (e.g. USD, CAD, GBP)"
+              value={formData.rateCurrency || 'USD'}
+              onChange={(e) => setFormData({ ...formData, rateCurrency: e.target.value })}
               fullWidth
             />
             <TextField
-              label="Day Rate ($)"
+              label="Union Rate (cents, e.g. 120000 = $1,200)"
               type="number"
-              value={formData.dayRate ?? ''}
-              onChange={(e) => setFormData({ ...formData, dayRate: parseFloat(e.target.value) })}
+              value={formData.unionRateCents ?? ''}
+              onChange={(e) => setFormData({ ...formData, unionRateCents: parseInt(e.target.value) })}
               fullWidth
             />
             <TextField
-              label="Week Rate ($)"
+              label="Non-Union Rate (cents)"
               type="number"
-              value={formData.weekRate ?? ''}
-              onChange={(e) => setFormData({ ...formData, weekRate: parseFloat(e.target.value) })}
+              value={formData.nonUnionRateCents ?? ''}
+              onChange={(e) => setFormData({ ...formData, nonUnionRateCents: parseInt(e.target.value) })}
               fullWidth
             />
             <TextField
-              label="Source"
-              value={formData.source || ''}
-              onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+              label="Source Name"
+              value={formData.sourceName || ''}
+              onChange={(e) => setFormData({ ...formData, sourceName: e.target.value })}
               fullWidth
+            />
+            <TextField
+              label="Source URL"
+              value={formData.sourceUrl || ''}
+              onChange={(e) => setFormData({ ...formData, sourceUrl: e.target.value })}
+              fullWidth
+            />
+            <TextField
+              label="Notes"
+              value={formData.notes || ''}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              fullWidth
+              multiline
+              minRows={2}
               sx={{ gridColumn: '1 / -1' }}
             />
           </Box>

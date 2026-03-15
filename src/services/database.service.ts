@@ -10,7 +10,6 @@ export interface Report {
   id: string;
   user_id: string;
   script_title: string;
-  script_file_path?: string;
   status: 'processing' | 'completed' | 'failed';
   report_type: 'free' | 'paid' | 'b2b';
   report_data?: any;
@@ -44,16 +43,15 @@ export interface GrantOpportunity {
 export class DatabaseService {
   async createReport(
     _userId: string,
-    scriptTitle: string,
-    reportType: 'free' | 'paid',
-    scriptFilePath?: string
+    scriptFile: File,
+    metadata: Record<string, unknown>
   ): Promise<{ reportId: string; error: string | null }> {
     try {
-      const data = await apiClient.post<{ report_id: string }>('/api/reports', {
-        script_title: scriptTitle,
-        report_type: reportType,
-        script_file_path: scriptFilePath,
-      }, { auth: true });
+      const form = new FormData();
+      form.append('script_file', scriptFile);
+      form.append('body', JSON.stringify(metadata));
+
+      const data = await apiClient.upload<{ report_id: string }>('/api/reports', form, { auth: true });
       return { reportId: data.report_id, error: null };
     } catch (error) {
       return { reportId: '', error: error instanceof Error ? error.message : 'Failed to create report' };
@@ -201,7 +199,7 @@ export class DatabaseService {
     }
   }
 
-  async hasUsedFreeReport(email: string): Promise<boolean> {
+  async hasUsedFreeReport(_email: string): Promise<boolean> {
     try {
       const reports = await apiClient.get<Report[]>('/api/reports', { auth: true });
       return reports.length > 0;
@@ -234,17 +232,6 @@ export class DatabaseService {
       return { metrics, error: null };
     } catch (error) {
       return { metrics: null, error: error instanceof Error ? error.message : 'Failed to fetch business metrics' };
-    }
-  }
-
-  async uploadScript(_userId: string, file: File): Promise<{ path: string; error: string | null }> {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const data = await apiClient.upload<{ path: string }>('/api/scripts/upload', formData, { auth: true });
-      return { path: data.path, error: null };
-    } catch (error) {
-      return { path: '', error: error instanceof Error ? error.message : 'Failed to upload script' };
     }
   }
 

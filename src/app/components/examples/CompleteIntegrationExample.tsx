@@ -18,7 +18,6 @@ export function CompleteIntegrationExample() {
   const [processing, setProcessing] = useState(false);
 
   const steps = [
-    'Upload Script',
     'Create Report',
     'Process in Background',
     'Complete',
@@ -41,31 +40,28 @@ export function CompleteIntegrationExample() {
         throw new Error('Not authenticated');
       }
 
-      // STEP 1: Upload script to backend storage
+      // STEP 1: Create report with script file + metadata in one request
       setActiveStep(0);
-      const upload = await databaseService.uploadScript(user.id, file);
-      if (upload.error || !upload.path) {
-        throw new Error(upload.error || 'Upload failed');
-      }
-
-      // STEP 2: Create report and trigger backend orchestration
-      setActiveStep(1);
-      const created = await databaseService.createReport(user.id, file.name, 'paid', upload.path);
+      const metadata = {
+        script_title: file.name,
+        report_type: 'paid',
+      };
+      const created = await databaseService.createReport(user.id, file, metadata);
       if (created.error || !created.reportId) {
         throw new Error(created.error || 'Failed to create report');
       }
       setReportId(created.reportId);
       toast.success('Report processing started.');
 
-      // STEP 3: Poll status until terminal
-      setActiveStep(2);
+      // STEP 2: Poll status until terminal
+      setActiveStep(1);
       const status = await waitForReportCompletion(created.reportId);
       if (status !== 'completed') {
         throw new Error('Report processing failed');
       }
 
-      // STEP 4: Complete
-      setActiveStep(3);
+      // STEP 3: Complete
+      setActiveStep(2);
       toast.success('Report complete.');
 
       // Navigate to report
@@ -77,7 +73,7 @@ export function CompleteIntegrationExample() {
 
     } catch (error) {
       console.error('Workflow error:', error);
-      toast.error(`Error: ${error.message}`);
+      toast.error(`Error: ${error instanceof Error ? error.message : 'Something went wrong'}`);
     } finally {
       setProcessing(false);
     }
